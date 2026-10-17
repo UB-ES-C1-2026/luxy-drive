@@ -1,6 +1,7 @@
 name: Back-merge main → staging
 
-# Si main tiene cambios que staging no tiene (un hotfix), abre una PR main → staging.
+# Si main tiene cambios que staging no tiene (un hotfix), abre un issue para hacer la PR
+# main → staging. (La organización no permite que GitHub Actions cree PRs.)
 # Un release normal (staging → main) no deja diferencias y no abre nada.
 on:
   push:
@@ -8,7 +9,8 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
+  issues: write
+  pull-requests: read
 
 jobs:
   back-merge:
@@ -17,9 +19,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Abrir PR si hace falta
+      - name: Avisar si staging no tiene lo de main
         env:
           GH_TOKEN: ${{ github.token }}
+          COMPARE_URL: https://github.com/${{ github.repository }}/compare/staging...main?expand=1
         run: |
           git fetch origin staging
           # Cambios de main desde el último punto común con staging
@@ -31,6 +34,10 @@ jobs:
             echo "Ya hay una PR main → staging abierta."
             exit 0
           fi
-          gh pr create --base staging --head main \
-            --title "chore: back-merge main → staging" \
-            --body "Hotfix aplicado en main. Mergea esta PR (merge commit) para que staging no lo pierda. Si los checks no arrancan, cierra y reabre la PR."
+          title="Back-merge pendiente: main → staging"
+          if gh issue list --state open --json title --jq '.[].title' | grep -qxF "$title"; then
+            echo "Ya hay un issue abierto."
+            exit 0
+          fi
+          echo "::warning::main tiene cambios que staging no tiene."
+          gh issue create --title "$title" --body "main tiene un hotfix que staging no tiene. Abre una PR **main → staging** y mérgeala con *merge commit*: $COMPARE_URL"

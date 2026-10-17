@@ -57,9 +57,9 @@ feature/*  ──PR──►  staging  ──PR──►  main  ──tag v*─�
    git tag v0.1.0 && git push origin v0.1.0
    ```
    El tag despliega a producción.
-6. **Hotfix:** rama `hotfix/...` desde `main` → PR a `main` → tag. Al mergear, se abre sola una PR `main → staging` para que staging no pierda el arreglo (mergéala con merge commit; si sus checks no arrancan, ciérrala y reábrela).
+6. **Hotfix:** rama `hotfix/...` desde `main` → PR a `main` → tag. Al mergear, se abre solo un issue "Back-merge pendiente": abre la PR `main → staging` y mérgeala con merge commit para que staging no pierda el arreglo.
 
-Reglas de GitHub: `staging` y `main` solo aceptan PRs con CI en verde y 1 aprobación; `main` solo acepta PRs desde `staging` o `hotfix/*`; `dev` solo la escribe GitHub Actions. **Nunca hagas push a `dev`.**
+Reglas del equipo: a `staging` y `main` solo se llega por PR con CI en verde y 1 aprobación; `main` solo acepta PRs desde `staging` o `hotfix/*` (el check `source-branch` falla si no); `dev` solo la escribe GitHub Actions. **Nunca hagas push directo a `staging`, `main` ni `dev`.**
 
 ## Base de datos (D1)
 
