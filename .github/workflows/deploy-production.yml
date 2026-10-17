@@ -1,0 +1,37 @@
+name: Deploy production
+
+# Producción solo se despliega al crear un tag v* sobre un commit de main.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app.luxydrive.workers.dev
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: El tag debe apuntar a un commit de main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::El tag ${GITHUB_REF_NAME} no está en main. Solo se despliegan tags de main."
+            exit 1
+          fi
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/deploy
+        with:
+          environment: production
+          api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          account-id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}

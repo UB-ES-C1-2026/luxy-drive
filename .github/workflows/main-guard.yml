@@ -1,0 +1,24 @@
+name: Main guard
+
+# main = producción. Solo acepta PRs desde staging o hotfix/*.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  source-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comprobar rama de origen
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [[ "$HEAD_REF" == "staging" || "$HEAD_REF" == hotfix/* ]]; then
+            echo "OK: $HEAD_REF → main"
+          else
+            echo "::error::main solo acepta PRs desde 'staging' o 'hotfix/*' (esta viene de '$HEAD_REF')."
+            exit 1
+          fi

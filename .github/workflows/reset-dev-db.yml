@@ -1,0 +1,54 @@
+name: Reset dev DB
+
+# Borra todas las tablas de la D1 de dev, vuelve a aplicar las migraciones de la rama dev
+# y carga apps/api/seed/dev.sql si existe. Solo para dev.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Escribe "reset-dev" para confirmar'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    if: inputs.confirm == 'reset-dev'
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+      - uses: ./.github/actions/setup
+      - name: Borrar tablas
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          tables=$(pnpm exec wrangler d1 execute DB --remote --env dev --json \
+            --command "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'" \
+            | jq -r '.[0].results[].name')
+          if [ -z "$tables" ]; then echo "No hay tablas."; exit 0; fi
+          sql="PRAGMA defer_foreign_keys = on;"
+          for t in $tables; do sql+=" DROP TABLE IF EXISTS \"$t\";"; done
+          echo "$sql"
+          pnpm exec wrangler d1 execute DB --remote --env dev --command "$sql"
+      - name: Migraciones
+        working-directory: apps/api
+        run: pnpm exec wrangler d1 migrations apply DB --remote --env dev
+      - name: Seed
+        working-directory: apps/api
+        run: |
+          if [ -f seed/dev.sql ]; then
+            pnpm exec wrangler d1 execute DB --remote --env dev --file seed/dev.sql
+          else
+            echo "Sin seed/dev.sql"
+          fi

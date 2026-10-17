@@ -1,0 +1,36 @@
+name: Back-merge main → staging
+
+# Si main tiene cambios que staging no tiene (un hotfix), abre una PR main → staging.
+# Un release normal (staging → main) no deja diferencias y no abre nada.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  back-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Abrir PR si hace falta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch origin staging
+          # Cambios de main desde el último punto común con staging
+          if git diff --quiet origin/staging...origin/main; then
+            echo "staging ya tiene todo lo de main."
+            exit 0
+          fi
+          if [ -n "$(gh pr list --base staging --head main --state open --json number --jq '.[].number')" ]; then
+            echo "Ya hay una PR main → staging abierta."
+            exit 0
+          fi
+          gh pr create --base staging --head main \
+            --title "chore: back-merge main → staging" \
+            --body "Hotfix aplicado en main. Mergea esta PR (merge commit) para que staging no lo pierda. Si los checks no arrancan, cierra y reabre la PR."

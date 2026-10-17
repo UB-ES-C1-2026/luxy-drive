@@ -1,0 +1,72 @@
+// Un Worker por entorno: sirve el front estático (apps/web/dist) y ejecuta Hono solo en /api/*.
+// La config de nivel superior es para desarrollo local (`wrangler dev`, D1 simulada).
+// Los despliegues reales siempre llevan --env dev | staging | production (los hace la CI).
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "luxydrive-local",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "assets": {
+    "directory": "../web/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "observability": { "enabled": true },
+  "vars": { "APP_ENV": "local" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "luxydrive-dev",
+      "database_id": "dd17ed97-189d-4a70-83dc-0e85a957d044",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "env": {
+    // https://dev.luxydrive.workers.dev — staging + PRs abiertas
+    "dev": {
+      "name": "dev",
+      "workers_dev": true,
+      "preview_urls": false,
+      "vars": { "APP_ENV": "dev" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "luxydrive-dev",
+          "database_id": "dd17ed97-189d-4a70-83dc-0e85a957d044",
+          "migrations_dir": "migrations"
+        }
+      ]
+    },
+    // https://staging.luxydrive.workers.dev — preproducción
+    "staging": {
+      "name": "staging",
+      "workers_dev": true,
+      "preview_urls": false,
+      "vars": { "APP_ENV": "staging" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "luxydrive-staging",
+          "database_id": "4726a639-fca5-47a9-87ae-35478ec085fa",
+          "migrations_dir": "migrations"
+        }
+      ]
+    },
+    // https://app.luxydrive.workers.dev — producción (solo con tag v* en main)
+    "production": {
+      "name": "app",
+      "workers_dev": true,
+      "preview_urls": false,
+      "vars": { "APP_ENV": "production" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "luxydrive-prod",
+          "database_id": "c30a84c1-8456-4abc-aa1c-f9cc8078a021",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
+}

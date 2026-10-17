@@ -1,0 +1,19 @@
+{
+  "name": "@luxydrive/ui",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"ui: sin tests todavía\""
+  },
+  "peerDependencies": {
+    "react": "^19"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "react": "19.3.1"
+  }
+}

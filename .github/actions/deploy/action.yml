@@ -1,0 +1,27 @@
+name: Deploy
+description: Build del front, migraciones D1 y wrangler deploy a un entorno
+inputs:
+  environment:
+    description: dev | staging | production
+    required: true
+  api-token:
+    required: true
+  account-id:
+    required: true
+runs:
+  using: composite
+  steps:
+    - run: pnpm build
+      shell: bash
+    - name: Migraciones D1
+      run: pnpm --filter @luxydrive/api exec wrangler d1 migrations apply DB --remote --env "${{ inputs.environment }}"
+      shell: bash
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.api-token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.account-id }}
+    - name: Deploy Worker
+      run: pnpm --filter @luxydrive/api exec wrangler deploy --env "${{ inputs.environment }}"
+      shell: bash
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.api-token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.account-id }}

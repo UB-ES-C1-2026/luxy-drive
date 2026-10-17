@@ -1,0 +1,81 @@
+name: Dev (staging + PRs abiertas)
+
+# La rama dev se regenera en cada cambio: staging + todas las PRs abiertas contra staging,
+# de la más antigua a la más nueva. Si una PR choca, se salta y se le pone la etiqueta
+# `dev-conflict`. Para excluir una PR a propósito, ponle la etiqueta `no-dev`.
+# Nadie hace push a dev a mano: se sobrescribe con --force.
+on:
+  pull_request:
+    branches: [staging]
+    types: [opened, synchronize, reopened, closed, labeled, unlabeled]
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dev
+  cancel-in-progress: true
+
+jobs:
+  rebuild-and-deploy:
+    # Un merge a staging ya lanza el evento push; no hace falta repetirlo por el "closed".
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.action != 'closed' ||
+      github.event.pull_request.merged == false
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://dev.luxydrive.workers.dev
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: staging
+          fetch-depth: 0
+
+      - name: Construir dev = staging + PRs abiertas
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          gh label create dev-conflict --color B60205 --description "No entra en dev por conflictos" --force >/dev/null
+          gh label create no-dev --color CCCCCC --description "Excluida de dev a propósito" --force >/dev/null
+
+          included=(); conflicted=(); skipped=()
+          for n in $(gh pr list --base staging --state open --limit 100 --json number --jq 'sort_by(.number) | .[].number'); do
+            if gh pr view "$n" --json labels --jq '.labels[].name' | grep -qx no-dev; then
+              skipped+=("$n"); continue
+            fi
+            git fetch --quiet origin "pull/$n/head:pr-$n"
+            if git merge --no-ff --no-edit -m "dev: merge #$n" "pr-$n" >/dev/null 2>&1; then
+              included+=("$n")
+              gh pr edit "$n" --remove-label dev-conflict >/dev/null 2>&1 || true
+            else
+              git merge --abort
+              conflicted+=("$n")
+              gh pr edit "$n" --add-label dev-conflict >/dev/null
+            fi
+          done
+
+          git push --force origin HEAD:dev
+
+          {
+            echo "## dev = staging + ${#included[@]} PR(s)"
+            echo "- Incluidas: ${included[*]:-ninguna}"
+            echo "- Con conflicto (fuera de dev): ${conflicted[*]:-ninguna}"
+            echo "- Excluidas con no-dev: ${skipped[*]:-ninguna}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # El push hecho con GITHUB_TOKEN no dispara otros workflows: desplegamos aquí mismo.
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/deploy
+        with:
+          environment: dev
+          api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          account-id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
