@@ -35,6 +35,12 @@ packages/ui     @luxydrive/ui: única librería de componentes del front (basada
 
 Cada entorno es **un solo Worker de Cloudflare**: sirve los archivos estáticos de `apps/web/dist` (gratis, sin ejecutar código) y solo ejecuta Hono para `/api/*`. Front y API comparten origen, así que no hay CORS. El front llama a la API con el cliente tipado de Hono (`apps/web/src/api.ts`).
 
+### Sistema de diseño
+
+Todos los componentes del front están en `@luxydrive/ui` y siguen `DESIGN.md`. Puedes verlos funcionando en el **catálogo de componentes**: https://dev.luxydrive.workers.dev
+
+Antes de hacer una pantalla, mira el catálogo y móntala con esos componentes. Si falta alguno, créalo en `packages/ui` siguiendo `DESIGN.md` (ver [AGENTS.md](AGENTS.md)).
+
 ## Empezar
 
 Requisitos: Node 22 y pnpm (`corepack enable`).
