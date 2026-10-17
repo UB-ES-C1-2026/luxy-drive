@@ -8,6 +8,21 @@ Marketplace de experiencias en vehículos de lujo (jets privados, yates y autoca
 | staging | https://staging.luxydrive.workers.dev | `staging` | se mergea una PR en `staging` |
 | producción | https://app.luxydrive.workers.dev | `main` | se crea un tag `v*` sobre `main` |
 
+## Equipo
+
+| Persona | Rol Scrum | Rol técnico (Sprint 0) |
+| --- | --- | --- |
+| Alba Cano Iglesias | Product Owner | Frontend |
+| Roger Ayala | Scrum Master | Backend |
+| Adam | — | DevOps |
+| Ignacio Martínez Allué | — | Backend |
+| Fedor Gorshkov | — | Frontend |
+| Muqaddam Ahmad Mehmood Ashraf | — | QA |
+
+- **Product Owner:** escribe las user stories en Trello (con criterios de aceptación), crea las issues en GitHub y acepta lo terminado.
+- **Scrum Master:** coordina el equipo, lleva el Excel del sprint y vigila que Trello, issues y Excel cuadren.
+- **Roles técnicos:** cada persona cambia de rol técnico al menos una vez durante el curso.
+
 ## Stack
 
 Monorepo con pnpm workspaces.
