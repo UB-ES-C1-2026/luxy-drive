@@ -8,6 +8,21 @@ Marketplace de experiencias en vehículos de lujo (jets privados, yates y autoca
 | staging | https://staging.luxydrive.workers.dev | `staging` | se mergea una PR en `staging` |
 | producción | https://app.luxydrive.workers.dev | `main` | se crea un tag `v*` sobre `main` |
 
+## Equipo
+
+| Persona | Rol Scrum | Rol técnico (Sprint 0) |
+| --- | --- | --- |
+| Alba Cano Iglesias | Product Owner | Frontend |
+| Roger Ayala | Scrum Master | Backend |
+| Adam | — | DevOps |
+| Ignacio Martínez Allué | — | Backend |
+| Fedor Gorshkov | — | Frontend |
+| Muqaddam Ahmad Mehmood Ashraf | — | QA |
+
+- **Product Owner:** escribe las user stories en Trello (con criterios de aceptación), crea las issues en GitHub y acepta lo terminado.
+- **Scrum Master:** coordina el equipo, lleva el Excel del sprint y vigila que Trello, issues y Excel cuadren.
+- **Roles técnicos:** cada persona cambia de rol técnico al menos una vez durante el curso.
+
 ## Stack
 
 Monorepo con pnpm workspaces.
@@ -60,6 +75,21 @@ feature/*  ──PR──►  staging  ──PR──►  main  ──tag v*─�
 6. **Hotfix:** rama `hotfix/...` desde `main` → PR a `main` → tag. Al mergear, se abre solo un issue "Back-merge pendiente": abre la PR `main → staging` y mérgeala con merge commit para que staging no pierda el arreglo.
 
 Reglas del equipo: a `staging` y `main` solo se llega por PR con CI en verde y 1 aprobación; `main` solo acepta PRs desde `staging` o `hotfix/*` (el check `source-branch` falla si no); `dev` solo la escribe GitHub Actions. **Nunca hagas push directo a `staging`, `main` ni `dev`.**
+
+## Definition of Done
+
+Una tarea solo pasa a Done cuando cumple todo esto. La [plantilla de PR](.github/pull_request_template.md) ya incluye el checklist.
+
+- [ ] Cumple los criterios de aceptación de su user story (Trello).
+- [ ] La PR va contra `staging` y cierra su issue (`Closes #n`).
+- [ ] `pnpm lint && pnpm typecheck && pnpm build && pnpm test` pasan y la CI está en verde.
+- [ ] Cada endpoint nuevo tiene su test en `apps/api/test/`.
+- [ ] Se ha probado en dev (https://dev.luxydrive.workers.dev).
+- [ ] Una persona del equipo (no el agente) ha revisado y aprobado la PR.
+- [ ] La PR indica qué partes ha generado un agente y qué se ha corregido.
+- [ ] README / AGENTS.md actualizados si el cambio lo necesita.
+- [ ] La Product Owner ha aceptado la funcionalidad.
+- [ ] La issue está en Done en el Project y la tarea al día en el Excel.
 
 ## Base de datos (D1)
 
