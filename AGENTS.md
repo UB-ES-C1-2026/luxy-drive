@@ -19,14 +19,14 @@ Reglas obligatorias para cualquier agente (Claude Code, Codex, Cursor, Copilot�
    pnpm lint && pnpm typecheck && pnpm build && pnpm test
    ```
    Nunca lo fuerces con `any`, `@ts-ignore`, `biome-ignore`, `.skip` ni borrando tests.
-5. **La PR** lleva un título en Conventional Commits (`feat(api): …`) y una descripción con: ID de la tarea, qué y por qué, cómo probarlo y qué ha generado el agente. Un humano la revisa antes del merge.
+5. **La PR** lleva un título en Conventional Commits (`feat(api): …`) y rellena la [plantilla de PR](.github/pull_request_template.md): ID de la tarea, qué y por qué, cómo probarlo, qué ha generado el agente y el checklist de la Definition of Done. Un humano la revisa antes del merge.
 6. **Nunca** hagas push a `staging`, `main` ni `dev`. Tampoco merges, tags, `wrangler deploy` ni comandos con `--remote`. Eso lo hacen las personas y la CI.
 
 ## Front (`apps/web`)
 
 - Usa **solo componentes de `@luxydrive/ui`**. En `apps/web`, Tailwind sirve solo para layout (`flex`, `grid`, `gap`, márgenes). Colores, tipografía, bordes y sombras van dentro de `packages/ui`.
 - **Si falta un componente**, créalo en `packages/ui/src/<nombre>.tsx`, expórtalo en `index.ts` y usa los tokens de `DESIGN.md`. Nada de colores hex sueltos.
-- **`DESIGN.md` describe el estilo de Airbnb como referencia.** No uses nombres, logos, textos, iconos ni imágenes de Airbnb. La tipografía es **Inter**.
+- **Tipografía: Inter**, la única. Usa solo imágenes propias o con licencia, y nunca marcas ni logos de terceros.
 - **Datos:** llama a la API solo con `client` (`apps/web/src/api.ts`), preferiblemente en el `loader` de la ruta. Nunca uses `fetch` a mano.
 - **Rutas:** una ruta = un archivo en `src/routes/`. No edites `routeTree.gen.ts`, que es generado.
 - **Accesibilidad:** usa elementos nativos (`button`, `a`, `label`), deja el foco visible, pon `alt` en las imágenes y diseña para móvil primero.
