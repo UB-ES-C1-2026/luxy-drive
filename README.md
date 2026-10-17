@@ -61,6 +61,21 @@ feature/*  ──PR──►  staging  ──PR──►  main  ──tag v*─�
 
 Reglas del equipo: a `staging` y `main` solo se llega por PR con CI en verde y 1 aprobación; `main` solo acepta PRs desde `staging` o `hotfix/*` (el check `source-branch` falla si no); `dev` solo la escribe GitHub Actions. **Nunca hagas push directo a `staging`, `main` ni `dev`.**
 
+## Definition of Done
+
+Una tarea solo pasa a Done cuando cumple todo esto. La [plantilla de PR](.github/pull_request_template.md) ya incluye el checklist.
+
+- [ ] Cumple los criterios de aceptación de su user story (Trello).
+- [ ] La PR va contra `staging` y cierra su issue (`Closes #n`).
+- [ ] `pnpm lint && pnpm typecheck && pnpm build && pnpm test` pasan y la CI está en verde.
+- [ ] Cada endpoint nuevo tiene su test en `apps/api/test/`.
+- [ ] Se ha probado en dev (https://dev.luxydrive.workers.dev).
+- [ ] Una persona del equipo (no el agente) ha revisado y aprobado la PR.
+- [ ] La PR indica qué partes ha generado un agente y qué se ha corregido.
+- [ ] README / AGENTS.md actualizados si el cambio lo necesita.
+- [ ] La Product Owner ha aceptado la funcionalidad.
+- [ ] La issue está en Done en el Project y la tarea al día en el Excel.
+
 ## Base de datos (D1)
 
 - Una base de datos por entorno: `luxydrive-dev`, `luxydrive-staging`, `luxydrive-prod`.
