@@ -149,6 +149,35 @@ precio total fijo. Son suficientes para US-001 y US-002; separar entidades o añ
 reservas queda para requisitos posteriores. Los casos de demo deben incluir las tres
 categorías, un empty-leg y experiencias caducadas o con servicio pasado.
 
+### API de catálogo (US-001.b)
+
+`GET /api/experiences` devuelve `200` con un array de experiencias disponibles,
+ordenadas por `service_at` y después `id`. Sin resultados devuelve `[]`.
+No necesita parámetros ni autenticación en Sprint 0.
+
+```json
+[
+  {
+    "id": 1,
+    "title": "Vuelo de demo",
+    "category": "jet",
+    "location": "Madrid → Palma",
+    "serviceAt": "2026-11-01T12:00:00.000Z",
+    "price": 1250.5,
+    "currency": "EUR",
+    "priceUnit": "experiencia completa",
+    "offerType": "empty_leg"
+  }
+]
+```
+
+`price` ya está en euros: la API divide `price_cents` entre 100; el frontend no debe
+volver a dividirlo. `serviceAt` es ISO 8601 UTC: presentar con `Intl.DateTimeFormat`
+y `timeZone: "Europe/Madrid"`. `category` y `offerType` conservan los valores del modelo.
+El frontend puede usar `client.api.experiences.$get()`; el tipo se deriva de `AppType`.
+Un fallo interno devuelve `500` y `{ "error": "internal_error" }`, sin detalles de D1.
+El seed y las pantallas se implementan en sus tareas correspondientes.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
