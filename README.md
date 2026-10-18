@@ -178,6 +178,23 @@ El frontend puede usar `client.api.experiences.$get()`; el tipo se deriva de `Ap
 Un fallo interno devuelve `500` y `{ "error": "internal_error" }`, sin detalles de D1.
 El seed y las pantallas se implementan en sus tareas correspondientes.
 
+### API de detalle (US-002.b)
+
+`GET /api/experiences/:id` devuelve el mismo objeto que el catálogo más `description`,
+`vehicle` y `capacity`. El frontend puede usar
+`client.api.experiences[":id"].$get({ param: { id: "1" } })`.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Disponible | `200` | Detalle de la experiencia |
+| `id` no es un entero positivo | `400` | `{ "error": "invalid_id" }` |
+| No existe o no está publicada | `404` | `{ "error": "not_found" }` |
+| Publicada pero ya no disponible (oferta inactiva o caducada, o servicio pasado) | `410` | `{ "error": "not_available" }` |
+| Fallo interno | `500` | `{ "error": "internal_error" }` |
+
+Una experiencia sin publicar responde como inexistente para no revelar borradores.
+"Disponible" sigue la definición del modelo, con `now` calculado una vez por petición.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
