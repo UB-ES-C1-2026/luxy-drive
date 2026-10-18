@@ -104,6 +104,51 @@ Una tarea solo pasa a Done cuando cumple todo esto. La [plantilla de PR](.github
 - **Nunca edites una migración ya mergeada**: crea una nueva con `pnpm db:new`.
 - En dev las migraciones de PRs se acumulan (aunque la PR se cierre). Si dev queda inconsistente: Actions → **Reset dev DB** → escribe `reset-dev`. Borra las tablas de dev, reaplica las migraciones y carga `apps/api/seed/dev.sql` si existe.
 
+### Modelo mínimo de experiencias (SP-001.a)
+
+Una fila de `experiences` representa una experiencia concreta, con un vehículo descrito
+como texto y una fecha de servicio. En Sprint 0 no hay reservas; no se modelan todavía
+usuarios, proveedores ni inventarios separados. El seed ficticio pertenece a SP-001.b (#10).
+
+| Campo | Convención |
+| --- | --- |
+| `id` | Entero, clave primaria; se genera si se omite al insertar. |
+| `title`, `description`, `vehicle`, `location` | Nombre, descripción, vehículo y ciudad o ruta. |
+| `category` | `jet`, `yacht` o `camper`, igual que `ListingCategory` en la UI. |
+| `service_at`, `offer_expires_at` | Segundos Unix UTC, enteros (no milisegundos). |
+| `capacity` | Entero mayor que cero. |
+| `price_cents` | Entero no negativo en céntimos de EUR, por la experiencia completa. |
+| `published`, `offer_active` | `0` o `1`; por defecto `0` para no publicar datos incompletos. |
+| `offer_type` | `standard` (por defecto), `empty_leg` o `last_minute`. No cambia el filtro de disponibilidad. |
+
+**Disponible** significa que se cumplen las cuatro condiciones a la vez:
+`published = 1`, `offer_active = 1`, `offer_expires_at > now` y `service_at > now`.
+`now` se calcula una vez por petición en segundos UTC. En el instante exacto de caducidad
+o de inicio del servicio la experiencia deja de estar disponible. Una fila caducada se
+conserva: el detalle debe poder distinguirla de un identificador inexistente (US-002).
+
+Las fechas se guardan y comparan en UTC; la interfaz las presenta en **Europe/Madrid**,
+incluidos sus cambios de horario. El precio es siempre en **EUR por la experiencia completa**,
+no por persona. La UI convierte céntimos a euros dividiendo entre 100 cuando sea necesario.
+
+Ejemplo de inserción ficticia para quien prepare el seed (las fechas deberán ajustarse
+para que los casos disponibles sigan siendo futuros en la demo):
+
+```sql
+INSERT INTO experiences
+  (title, description, category, vehicle, location, service_at, capacity,
+   price_cents, published, offer_active, offer_expires_at, offer_type)
+VALUES
+  ('Vuelo de demo', 'Datos ficticios', 'jet', 'Jet ficticio', 'Madrid → Palma',
+   unixepoch('2026-11-01T12:00:00Z'), 6, 125050, 1, 1,
+   unixepoch('2026-10-31T12:00:00Z'), 'empty_leg');
+```
+
+Defaults del spike: una oferta y una fecha por experiencia, ubicación como texto libre y
+precio total fijo. Son suficientes para US-001 y US-002; separar entidades o añadir
+reservas queda para requisitos posteriores. Los casos de demo deben incluir las tres
+categorías, un empty-leg y experiencias caducadas o con servicio pasado.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
