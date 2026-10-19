@@ -9,8 +9,11 @@ import {
   ListingGrid,
   Logo,
   Notice,
+  OfferBadge,
   Search,
   Section,
+  Sparkles,
+  Text,
   TopNav,
 } from "@luxydrive/ui";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
@@ -34,6 +37,12 @@ const categoryLabel: Record<ListingCategory, string> = {
   camper: "Autocaravana",
 };
 
+const offerBadge = {
+  standard: null,
+  empty_leg: <OfferBadge icon={<Sparkles aria-hidden />}>Empty leg</OfferBadge>,
+  last_minute: <OfferBadge>Última hora</OfferBadge>,
+};
+
 // La API manda la fecha en UTC; aquí siempre la enseñamos en hora de Madrid.
 const serviceDate = new Intl.DateTimeFormat("es-ES", {
   day: "numeric",
@@ -46,30 +55,41 @@ const serviceDate = new Intl.DateTimeFormat("es-ES", {
 function Catalog() {
   const experiences = Route.useLoaderData();
 
-  return (
-    <CatalogPage>
-      {experiences.length === 0 ? (
+  if (experiences.length === 0) {
+    return (
+      <CatalogPage>
         <EmptyState
           icon={<Search aria-hidden />}
           title="No hay experiencias disponibles"
           description="Vuelve a mirar en unos días."
         />
-      ) : (
-        <ListingGrid>
-          {experiences.map((experience) => (
-            <li key={experience.id}>
-              <ListingCard
-                category={experience.category}
-                title={experience.title}
-                location={`${categoryLabel[experience.category]} · ${experience.location}`}
-                dates={serviceDate.format(new Date(experience.serviceAt))}
-                price={experience.price}
-                priceUnit={experience.priceUnit}
-              />
-            </li>
-          ))}
-        </ListingGrid>
-      )}
+      </CatalogPage>
+    );
+  }
+
+  const count = experiences.length;
+
+  return (
+    <CatalogPage subtitle={count === 1 ? "1 experiencia" : `${count} experiencias`}>
+      <ListingGrid>
+        {experiences.map((experience) => (
+          <li key={experience.id}>
+            <ListingCard
+              category={experience.category}
+              image={{
+                src: `/images/${experience.category}.jpg`,
+                alt: categoryLabel[experience.category],
+              }}
+              badge={offerBadge[experience.offerType]}
+              title={experience.title}
+              location={`${categoryLabel[experience.category]} · ${experience.location}`}
+              dates={serviceDate.format(new Date(experience.serviceAt))}
+              price={experience.price}
+              priceUnit={experience.priceUnit}
+            />
+          </li>
+        ))}
+      </ListingGrid>
     </CatalogPage>
   );
 }
@@ -113,7 +133,7 @@ function CatalogError() {
   );
 }
 
-function CatalogPage({ children }: { children: ReactNode }) {
+function CatalogPage({ subtitle, children }: { subtitle?: string; children: ReactNode }) {
   return (
     <>
       <TopNav
@@ -126,9 +146,12 @@ function CatalogPage({ children }: { children: ReactNode }) {
       <main>
         <Container size="wide">
           <Section className="flex flex-col gap-8">
-            <Heading as="h1" variant="display-xl">
-              Experiencias disponibles
-            </Heading>
+            <div className="flex flex-col gap-1">
+              <Heading as="h1" variant="display-xl">
+                Experiencias disponibles
+              </Heading>
+              {subtitle && <Text tone="muted">{subtitle}</Text>}
+            </div>
             {children}
           </Section>
         </Container>
