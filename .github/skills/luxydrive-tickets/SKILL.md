@@ -46,7 +46,7 @@ QUIERO <objetivo>
 PARA <beneficio>
 
 Granularidad: Fine | Medium | Epic
-Prioridad: Must | Should | Could
+Prioridad: Highest | High | Medium | Low | Lowest
 Story Points: <esfuerzo>   Value Points: <valor>   (solo Fine)
 
 Supuestos / comentarios: <si los hay>
@@ -97,11 +97,17 @@ Scenario: <nombre>
   - **Epic** (~60%): grandes, para dividir más adelante.
 - Sugiere una prioridad para cada historia. Para las Fine, añade una estimación de Story Points (esfuerzo) y Value Points (valor de negocio).
 
+### Prioridad y orden
+
+- **El orden manda.** La posición en la lista del Product Backlog es la prioridad real: el equipo tira siempre de la tarjeta de más arriba. Se ordena por ROI = Value Points / Story Points × 1/Riesgo; si una historia depende de otras, se usa el ROI de la cadena y sus prerrequisitos van justo encima.
+- **La etiqueta dice si el producto la necesita**, no cuándo se hace: `Highest` bloquea el resto del trabajo (spikes y requisitos técnicos de base), `High` es imprescindible para el producto final, `Medium` es conveniente, `Low` entra si hay tiempo y `Lowest` es opcional. Una historia `Medium` barata puede ir por delante de una `High` cara.
+- **Una sola escala** en todas partes: la etiqueta de Trello, la línea `Prioridad` de la tarjeta y el campo `Priority` del GitHub Project usan los mismos cinco valores.
+
 ## Issue de GitHub (tarea)
 
 - **Título:** el código y el nombre de la tarea.
 - **Assignee:** el responsable.
-- **Project:** la columna `To do`.
+- **Project:** la columna `To do`, con el mismo `Priority` que la tarjeta de su historia en Trello.
 
 ```markdown
 <CÓDIGO> · <Título de la tarea>
