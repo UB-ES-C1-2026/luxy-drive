@@ -4,6 +4,8 @@
 export { NewTag, OfferBadge, type OfferBadgeProps, Rating, type RatingProps } from "./badges";
 export {
   Button,
+  ButtonLink,
+  type ButtonLinkProps,
   type ButtonProps,
   HeartButton,
   type HeartButtonProps,

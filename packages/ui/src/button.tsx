@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode, Ref } from "react";
 import { Heart } from "./icons";
 import { cx, focusRing } from "./utils";
 
@@ -57,6 +57,35 @@ export function Button({
       {icon}
       {children}
     </button>
+  );
+}
+
+export type ButtonLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+  ref?: Ref<HTMLAnchorElement>;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+};
+
+/** Igual que Button, pero es un <a>: para botones que llevan a otra página. */
+export function ButtonLink({
+  variant = "primary",
+  size = "md",
+  className,
+  ref,
+  ...props
+}: ButtonLinkProps) {
+  return (
+    <a
+      ref={ref}
+      className={cx(
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap transition-colors",
+        focusRing,
+        variantClass[variant],
+        sizeClass[variant][size],
+        className,
+      )}
+      {...props}
+    />
   );
 }
 
