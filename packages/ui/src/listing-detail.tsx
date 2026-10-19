@@ -230,6 +230,7 @@ export type BookingCardProps = {
   children?: ReactNode;
   /** Desglose de precio; si hay líneas, se muestra el total. */
   breakdown?: PriceLine[];
+  /** Texto del botón ("Solicitar reserva"). Sin él, la tarjeta solo muestra el precio. */
   ctaLabel?: string;
   /** Nota bajo el CTA ("Todavía no se te cobrará nada"). */
   note?: string;
@@ -245,7 +246,7 @@ export function BookingCard({
   originalPrice,
   children,
   breakdown = [],
-  ctaLabel = "Solicitar reserva",
+  ctaLabel,
   note,
   disabled = false,
   onSubmit,
@@ -256,26 +257,35 @@ export function BookingCard({
     onSubmit?.();
   }
   const total = breakdown.reduce((sum, line) => sum + line.amount, 0);
+  const cardClass = cx(
+    "flex flex-col gap-6 rounded-md border border-hairline bg-canvas p-6 shadow-float",
+    className,
+  );
+  const priceLine = (
+    <p className="text-ink">
+      {originalPrice !== undefined && (
+        <span className="mr-2 text-body-md text-muted line-through">
+          <span className="sr-only">Antes </span>
+          {formatPrice(originalPrice)}
+        </span>
+      )}
+      <span className="text-display-md">{formatPrice(price)}</span>{" "}
+      <span className="text-body-md">{priceUnit}</span>
+    </p>
+  );
+
+  // Sin botón no hay nada que enviar: es una tarjeta de precio, no un formulario.
+  if (!ctaLabel) {
+    return (
+      <section aria-label="Precio" className={cardClass}>
+        {priceLine}
+      </section>
+    );
+  }
 
   return (
-    <form
-      onSubmit={submit}
-      aria-label="Reserva"
-      className={cx(
-        "flex flex-col gap-6 rounded-md border border-hairline bg-canvas p-6 shadow-float",
-        className,
-      )}
-    >
-      <p className="text-ink">
-        {originalPrice !== undefined && (
-          <span className="mr-2 text-body-md text-muted line-through">
-            <span className="sr-only">Antes </span>
-            {formatPrice(originalPrice)}
-          </span>
-        )}
-        <span className="text-display-md">{formatPrice(price)}</span>{" "}
-        <span className="text-body-md">{priceUnit}</span>
-      </p>
+    <form onSubmit={submit} aria-label="Reserva" className={cardClass}>
+      {priceLine}
       {children && <div className="flex flex-col gap-4">{children}</div>}
       <div className="flex flex-col gap-3">
         <Button type="submit" fullWidth disabled={disabled}>
