@@ -47,7 +47,7 @@ PARA <beneficio>
 
 Granularidad: Fine | Medium | Epic
 Prioridad: Highest | High | Medium | Low | Lowest
-Story Points: <esfuerzo>   Value Points: <valor>   (solo Fine)
+Story Points: <esfuerzo> · Value Points: <valor> · Riesgo: Bajo (1) | Medio (2) | Alto (3) · ROI: <VP / SP × 1/Riesgo>   (obligatorio en Fine)
 
 Supuestos / comentarios: <si los hay>
 
@@ -95,7 +95,7 @@ Scenario: <nombre>
   - **Fine** (el ~20% de arriba): detalladas y listas para construir.
   - **Medium** (~20%): esbozadas.
   - **Epic** (~60%): grandes, para dividir más adelante.
-- Sugiere una prioridad para cada historia. Para las Fine, añade una estimación de Story Points (esfuerzo) y Value Points (valor de negocio).
+- Sugiere una prioridad para cada historia. Para las Fine es obligatoria la estimación de Story Points (esfuerzo) y Value Points (valor de negocio); en las Medium es opcional.
 
 ### Prioridad y orden
 
