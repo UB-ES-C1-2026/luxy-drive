@@ -45,7 +45,7 @@ COMO <rol>
 QUIERO <objetivo>
 PARA <beneficio>
 
-Granularidad: Fine | Medium | Epic
+Granularidad: Fine | Medium | Épica
 Prioridad: Highest | High | Medium | Low | Lowest
 Story Points: <esfuerzo> · Value Points: <valor> · Riesgo: Bajo (1) | Medio (2) | Alto (3) · ROI: <VP / SP × 1/Riesgo>   (obligatorio en Fine)
 
