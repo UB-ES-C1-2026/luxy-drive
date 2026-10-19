@@ -59,7 +59,7 @@ Scenario: <nombre>
 ```
 
 - **Job story:** si una situación concreta es lo que dispara la necesidad, usa `CUANDO <situación>, QUIERO <motivación>, PARA PODER <resultado esperado>` con código `JS-xxx`. El resto de campos no cambia.
-- **Epic:** en lugar de criterios, pon un resultado en una línea y una nota de cómo se dividirá más adelante.
+- **Epic:** usa COMO / QUIERO / PARA igual que una historia, con `Granularidad: Épica`. Las historias en que se dividirá van en un checklist "División prevista" y el resultado esperado, en un único criterio dentro del checklist "Criterios de aceptación".
 - **TR, SP, DD, TD y BUG:** no usan COMO / QUIERO / PARA. Lleva el código, el título, una descripción en texto plano, la prioridad y al menos un criterio de aceptación.
 - **BUG:** en la descripción indica qué ocurre, qué se esperaba, cómo reproducirlo y qué historia afecta.
 
@@ -107,7 +107,7 @@ Scenario: <nombre>
 
 - **Título:** el código y el nombre de la tarea.
 - **Assignee:** el responsable.
-- **Project:** la columna `To do`, con el mismo `Priority` que la tarjeta de su historia en Trello.
+- **Project:** la columna `Sprint Backlog` si entra en el sprint en curso, o `Backlog` si no, con el mismo `Priority` que la tarjeta de su historia en Trello.
 
 ```markdown
 <CÓDIGO> · <Título de la tarea>
@@ -152,12 +152,12 @@ La rúbrica evalúa que Trello, el Excel, GitHub y la demo cuenten lo mismo.
 
 ### Flujo en el tablero (Kanban)
 
-- **Recorrido:** una issue empieza en `To do` y avanza por las columnas del Project hasta `Done`. La columna dice dónde está, de dónde viene y adónde va.
+- **Recorrido:** una issue empieza en `Backlog` o `Sprint Backlog` y avanza por `In progress` e `In review` hasta `Done`. La columna dice dónde está, de dónde viene y adónde va.
 - **Coger una tarea:** se coge del tablero (sistema pull); nadie empuja trabajo a otra persona. Quien la coge consta como assignee antes de moverla a la columna de trabajo en curso.
 - **Límite de trabajo en curso:** respeta el límite de cada columna. Si una columna está llena, ayuda a terminar lo que hay antes de coger algo nuevo, empezando por lo que está más a la derecha.
-- **Fechas:** se anotan la de entrada en `To do`, la de entrada en la columna de trabajo en curso y la de llegada a `Done`.
+- **Fechas:** se anotan la de entrada en `Sprint Backlog`, la de entrada en la columna de trabajo en curso y la de llegada a `Done`.
 - **Cuándo se cierra:** una issue solo pasa a `Done` cuando cumple la Definition of Done (checklist de la plantilla de PR) y la PO lo ha aceptado.
-- **Bug en algo terminado:** si aparece un bug en algo que ya está en `Done`, la issue no vuelve atrás. Se crea una nueva `BUG-xxx` en `To do` que enlace la original.
+- **Bug en algo terminado:** si aparece un bug en algo que ya está en `Done`, la issue no vuelve atrás. Se crea una nueva `BUG-xxx` en `Backlog` que enlace la original.
 
 ## Auto-revisión INVEST (obligatoria antes de la respuesta final)
 
