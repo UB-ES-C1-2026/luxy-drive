@@ -45,9 +45,9 @@ COMO <rol>
 QUIERO <objetivo>
 PARA <beneficio>
 
-Granularidad: Fine | Medium | Epic
-Prioridad: Must | Should | Could
-Story Points: <esfuerzo>   Value Points: <valor>   (solo Fine)
+Granularidad: Fine | Medium | Épica
+Prioridad: Highest | High | Medium | Low | Lowest
+Story Points: <esfuerzo> · Value Points: <valor> · Riesgo: Bajo (1) | Medio (2) | Alto (3) · ROI: <VP / SP × 1/Riesgo>   (obligatorio en Fine)
 
 Supuestos / comentarios: <si los hay>
 
@@ -59,7 +59,7 @@ Scenario: <nombre>
 ```
 
 - **Job story:** si una situación concreta es lo que dispara la necesidad, usa `CUANDO <situación>, QUIERO <motivación>, PARA PODER <resultado esperado>` con código `JS-xxx`. El resto de campos no cambia.
-- **Epic:** en lugar de criterios, pon un resultado en una línea y una nota de cómo se dividirá más adelante.
+- **Epic:** usa COMO / QUIERO / PARA igual que una historia, con `Granularidad: Épica`. Las historias en que se dividirá van en un checklist "División prevista" y el resultado esperado, en un único criterio dentro del checklist "Criterios de aceptación".
 - **TR, SP, DD, TD y BUG:** no usan COMO / QUIERO / PARA. Lleva el código, el título, una descripción en texto plano, la prioridad y al menos un criterio de aceptación.
 - **BUG:** en la descripción indica qué ocurre, qué se esperaba, cómo reproducirlo y qué historia afecta.
 
@@ -95,13 +95,19 @@ Scenario: <nombre>
   - **Fine** (el ~20% de arriba): detalladas y listas para construir.
   - **Medium** (~20%): esbozadas.
   - **Epic** (~60%): grandes, para dividir más adelante.
-- Sugiere una prioridad para cada historia. Para las Fine, añade una estimación de Story Points (esfuerzo) y Value Points (valor de negocio).
+- Sugiere una prioridad para cada historia. Para las Fine es obligatoria la estimación de Story Points (esfuerzo) y Value Points (valor de negocio); en las Medium es opcional.
+
+### Prioridad y orden
+
+- **El orden manda.** La posición en la lista del Product Backlog es la prioridad real: el equipo tira siempre de la tarjeta de más arriba. Se ordena por ROI = Value Points / Story Points × 1/Riesgo; si una historia depende de otras, se usa el ROI de la cadena y sus prerrequisitos van justo encima.
+- **La etiqueta dice si el producto la necesita**, no cuándo se hace: `Highest` bloquea el resto del trabajo (spikes y requisitos técnicos de base), `High` es imprescindible para el producto final, `Medium` es conveniente, `Low` entra si hay tiempo y `Lowest` es opcional. Una historia `Medium` barata puede ir por delante de una `High` cara.
+- **Una sola escala** en todas partes: la etiqueta de Trello, la línea `Prioridad` de la tarjeta y el campo `Priority` del GitHub Project usan los mismos cinco valores.
 
 ## Issue de GitHub (tarea)
 
 - **Título:** el código y el nombre de la tarea.
 - **Assignee:** el responsable.
-- **Project:** la columna `To do`.
+- **Project:** la columna `Sprint Backlog` si entra en el sprint en curso, o `Backlog` si no, con el mismo `Priority` que la tarjeta de su historia en Trello.
 
 ```markdown
 <CÓDIGO> · <Título de la tarea>
@@ -146,12 +152,12 @@ La rúbrica evalúa que Trello, el Excel, GitHub y la demo cuenten lo mismo.
 
 ### Flujo en el tablero (Kanban)
 
-- **Recorrido:** una issue empieza en `To do` y avanza por las columnas del Project hasta `Done`. La columna dice dónde está, de dónde viene y adónde va.
+- **Recorrido:** una issue empieza en `Backlog` o `Sprint Backlog` y avanza por `In progress` e `In review` hasta `Done`. La columna dice dónde está, de dónde viene y adónde va.
 - **Coger una tarea:** se coge del tablero (sistema pull); nadie empuja trabajo a otra persona. Quien la coge consta como assignee antes de moverla a la columna de trabajo en curso.
 - **Límite de trabajo en curso:** respeta el límite de cada columna. Si una columna está llena, ayuda a terminar lo que hay antes de coger algo nuevo, empezando por lo que está más a la derecha.
-- **Fechas:** se anotan la de entrada en `To do`, la de entrada en la columna de trabajo en curso y la de llegada a `Done`.
+- **Fechas:** se anotan la de entrada en `Sprint Backlog`, la de entrada en la columna de trabajo en curso y la de llegada a `Done`.
 - **Cuándo se cierra:** una issue solo pasa a `Done` cuando cumple la Definition of Done (checklist de la plantilla de PR) y la PO lo ha aceptado.
-- **Bug en algo terminado:** si aparece un bug en algo que ya está en `Done`, la issue no vuelve atrás. Se crea una nueva `BUG-xxx` en `To do` que enlace la original.
+- **Bug en algo terminado:** si aparece un bug en algo que ya está en `Done`, la issue no vuelve atrás. Se crea una nueva `BUG-xxx` en `Backlog` que enlace la original.
 
 ## Auto-revisión INVEST (obligatoria antes de la respuesta final)
 
