@@ -4,6 +4,7 @@ import {
   BookingBar,
   BookingCard,
   Button,
+  ButtonLink,
   Calendar,
   Caravan,
   CategoryTabs,
@@ -51,7 +52,7 @@ import {
   Wifi,
   X,
 } from "@luxydrive/ui";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, createLink } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { client } from "../api";
 
@@ -67,6 +68,8 @@ export const Route = createFileRoute("/")({
   },
   component: ComponentCatalog,
 });
+
+const ExploreLink = createLink(ButtonLink);
 
 const colors: [string, string][] = [
   ["primary", "#ff385c"],
@@ -160,6 +163,11 @@ function ComponentCatalog() {
 
       <main>
         <Container>
+          <Section>
+            <ExploreLink to="/experiencias">Explorar</ExploreLink>
+          </Section>
+          <Divider />
+
           <Section className="flex flex-col gap-6">
             <div className="flex flex-col gap-2">
               <Heading as="h1" variant="display-xl">
