@@ -82,6 +82,7 @@ function Catalog() {
               }}
               badge={offerBadge[experience.offerType]}
               title={experience.title}
+              href={`/experiencias/${experience.id}`}
               location={`${categoryLabel[experience.category]} · ${experience.location}`}
               dates={serviceDate.format(new Date(experience.serviceAt))}
               price={experience.price}

@@ -481,6 +481,7 @@ function ComponentCatalog() {
               <div className="lg:sticky lg:top-6 lg:self-start">
                 <BookingCard
                   price={4200}
+                  ctaLabel="Solicitar reserva"
                   originalPrice={9800}
                   priceUnit="experiencia completa"
                   note="Todavía no se te cobrará nada"

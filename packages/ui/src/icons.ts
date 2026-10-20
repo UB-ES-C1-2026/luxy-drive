@@ -5,6 +5,7 @@ export {
   BadgeCheck,
   Bed,
   Calendar,
+  CalendarDays,
   Caravan,
   ChevronLeft,
   ChevronRight,
