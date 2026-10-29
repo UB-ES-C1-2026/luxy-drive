@@ -104,6 +104,41 @@ it("orders all categories by service date and then id", async () => {
   ]);
 });
 
+it.each(["jet", "yacht", "camper"] as const)("filters by category=%s", async (category) => {
+  await insert({ id: 1, category: "jet" });
+  await insert({ id: 2, category: "yacht" });
+  await insert({ id: 3, category: "camper" });
+  const response = await SELF.fetch(`${url}?category=${category}`);
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as { category: string }[];
+  expect(body).toHaveLength(1);
+  expect(body[0]).toEqual(expect.objectContaining({ category }));
+});
+
+it("filters by category and still excludes unavailable experiences", async () => {
+  await insert({ id: 1, category: "yacht", published: 0 });
+  await insert({ id: 2, category: "yacht", expiresAt: 1 });
+  await insert({ id: 3, category: "yacht" });
+  await insert({ id: 4, category: "jet" });
+  const response = await SELF.fetch(`${url}?category=yacht`);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual([expect.objectContaining({ id: 3 })]);
+});
+
+it("returns an empty array when no experience matches the category", async () => {
+  await insert({ category: "jet" });
+  const response = await SELF.fetch(`${url}?category=camper`);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual([]);
+});
+
+it.each(["boat", "JET", ""])("rejects an invalid category: %j", async (category) => {
+  await insert();
+  const response = await SELF.fetch(`${url}?category=${category}`);
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({ error: "invalid_category" });
+});
+
 it("returns a JSON error without database details", async () => {
   vi.spyOn(env.DB, "prepare").mockImplementation(() => {
     throw new Error("private database details");

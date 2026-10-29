@@ -20,6 +20,10 @@ type ExperienceDetailRow = ExperienceSummaryRow & {
   available: 0 | 1;
 };
 
+const listQuery = z.object({
+  category: z.enum(["jet", "yacht", "camper"]).optional(),
+});
+
 const detailParams = z.object({
   id: z
     .string()
@@ -42,24 +46,32 @@ function toSummary(row: ExperienceSummaryRow) {
 }
 
 export const experiences = new Hono<{ Bindings: Bindings }>()
-  .get("/", async (c) => {
-    const now = Math.floor(Date.now() / 1000);
-    try {
-      const { results } = await c.env.DB.prepare(
-        `SELECT id, title, category, location, service_at, price_cents, offer_type
-         FROM experiences
-         WHERE published = 1 AND offer_active = 1
-           AND offer_expires_at > ? AND service_at > ?
-         ORDER BY service_at, id`,
-      )
-        .bind(now, now)
-        .all<ExperienceSummaryRow>();
+  .get(
+    "/",
+    zValidator("query", listQuery, (result, c) => {
+      if (!result.success) return c.json({ error: "invalid_category" } as const, 400);
+    }),
+    async (c) => {
+      const { category = null } = c.req.valid("query");
+      const now = Math.floor(Date.now() / 1000);
+      try {
+        const { results } = await c.env.DB.prepare(
+          `SELECT id, title, category, location, service_at, price_cents, offer_type
+           FROM experiences
+           WHERE published = 1 AND offer_active = 1
+             AND offer_expires_at > ? AND service_at > ?
+             AND (? IS NULL OR category = ?)
+           ORDER BY service_at, id`,
+        )
+          .bind(now, now, category, category)
+          .all<ExperienceSummaryRow>();
 
-      return c.json(results.map(toSummary), 200);
-    } catch {
-      return c.json({ error: "internal_error" } as const, 500);
-    }
-  })
+        return c.json(results.map(toSummary), 200);
+      } catch {
+        return c.json({ error: "internal_error" } as const, 500);
+      }
+    },
+  )
   .get(
     "/:id",
     zValidator("param", detailParams, (result, c) => {
