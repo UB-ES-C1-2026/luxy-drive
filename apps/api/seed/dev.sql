@@ -75,3 +75,15 @@ VALUES
    'Alquiler que ya se ha realizado.',
    'camper', 'Autocaravana integral de 4 plazas', 'San Sebastián',
    unixepoch('now', '-5 days'), 4, 160000, 1, 1, unixepoch('now', '-6 days'), 'standard');
+
+-- Precio original de las ofertas flash y empty-leg (JS-001.b). Las 4 y 9 están caducadas;
+-- las standard no tienen descuento.
+UPDATE experiences SET original_price_cents = CASE id
+  WHEN 2 THEN 980000
+  WHEN 3 THEN 690000
+  WHEN 4 THEN 760000
+  WHEN 7 THEN 250000
+  WHEN 9 THEN 560000
+  WHEN 12 THEN 195000
+END
+WHERE id IN (2, 3, 4, 7, 9, 12);
