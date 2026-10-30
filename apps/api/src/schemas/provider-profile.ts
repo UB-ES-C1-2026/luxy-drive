@@ -1,16 +1,19 @@
 import { z } from "zod";
 
-// "Contacto" has no format in US-008, so it is free text.
+// "Contacto" in US-008 is a phone: optional +, 9 to 15 digits (E.164 max),
+// single spaces or hyphens allowed between digits.
+const phone = /^\+?\d(?:[ -]?\d){8,14}$/;
+
 export const profileBody = z.object({
   tradeName: z.string().trim().min(1),
   description: z.string().trim().min(1),
-  contact: z.string().trim().min(1),
+  phone: z.string().trim().regex(phone),
 });
 
 const codes = {
   tradeName: "invalid_trade_name",
   description: "invalid_description",
-  contact: "invalid_contact",
+  phone: "invalid_phone",
 } as const;
 
 export function profileError(error: z.ZodError) {
