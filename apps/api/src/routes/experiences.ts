@@ -22,7 +22,13 @@ type ExperienceDetailRow = ExperienceSummaryRow & {
 
 const listQuery = z.object({
   category: z.enum(["jet", "yacht", "camper"]).optional(),
+  location: z.string().trim().min(1).max(100).optional(),
 });
+
+// SQLite only lowercases ASCII, so accents are removed here: "Málaga" matches "malaga".
+function normalize(text: string) {
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
 
 const detailParams = z.object({
   id: z
@@ -49,10 +55,14 @@ export const experiences = new Hono<{ Bindings: Bindings }>()
   .get(
     "/",
     zValidator("query", listQuery, (result, c) => {
-      if (!result.success) return c.json({ error: "invalid_category" } as const, 400);
+      if (result.success) return;
+      const field = result.error.issues[0]?.path[0];
+      return field === "location"
+        ? c.json({ error: "invalid_location" } as const, 400)
+        : c.json({ error: "invalid_category" } as const, 400);
     }),
     async (c) => {
-      const { category = null } = c.req.valid("query");
+      const { category = null, location } = c.req.valid("query");
       const now = Math.floor(Date.now() / 1000);
       try {
         const { results } = await c.env.DB.prepare(
@@ -66,7 +76,11 @@ export const experiences = new Hono<{ Bindings: Bindings }>()
           .bind(now, now, category, category)
           .all<ExperienceSummaryRow>();
 
-        return c.json(results.map(toSummary), 200);
+        const matches = location
+          ? results.filter((row) => normalize(row.location).includes(normalize(location)))
+          : results;
+
+        return c.json(matches.map(toSummary), 200);
       } catch {
         return c.json({ error: "internal_error" } as const, 500);
       }

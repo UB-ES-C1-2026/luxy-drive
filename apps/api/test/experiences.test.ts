@@ -17,6 +17,7 @@ afterEach(() => {
 async function insert({
   id = 1,
   category = "jet",
+  location = "Madrid → Palma",
   published = 1,
   active = 1,
   serviceAt = now + 86400,
@@ -34,7 +35,7 @@ async function insert({
       "Fictitious",
       category,
       "Demo vehicle",
-      "Madrid → Palma",
+      location,
       serviceAt,
       6,
       125050,
@@ -137,6 +138,47 @@ it.each(["boat", "JET", ""])("rejects an invalid category: %j", async (category)
   const response = await SELF.fetch(`${url}?category=${category}`);
   expect(response.status).toBe(400);
   expect(await response.json()).toEqual({ error: "invalid_category" });
+});
+
+it.each(["malaga", "Málaga", "MÁLAGA", "  malaga  "])(
+  "filters by location ignoring case and accents: %j",
+  async (location) => {
+    await insert({ id: 1, location: "Málaga" });
+    await insert({ id: 2, location: "Madrid" });
+    const response = await SELF.fetch(`${url}?location=${encodeURIComponent(location)}`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([expect.objectContaining({ id: 1, location: "Málaga" })]);
+  },
+);
+
+it("matches a city inside a route", async () => {
+  await insert({ id: 1, location: "Madrid → Palma" });
+  await insert({ id: 2, location: "Ibiza" });
+  const response = await SELF.fetch(`${url}?location=palma`);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual([expect.objectContaining({ id: 1 })]);
+});
+
+it("combines location and category filters", async () => {
+  await insert({ id: 1, category: "yacht", location: "Ibiza" });
+  await insert({ id: 2, category: "jet", location: "Valencia → Ibiza" });
+  await insert({ id: 3, category: "yacht", location: "Palma" });
+  const response = await SELF.fetch(`${url}?location=ibiza&category=yacht`);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual([expect.objectContaining({ id: 1 })]);
+});
+
+it("returns an empty array when no experience matches the location", async () => {
+  await insert({ location: "Madrid" });
+  const response = await SELF.fetch(`${url}?location=Oviedo`);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual([]);
+});
+
+it.each(["", "   ", "x".repeat(101)])("rejects an invalid location: %j", async (location) => {
+  const response = await SELF.fetch(`${url}?location=${location}`);
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({ error: "invalid_location" });
 });
 
 it("returns a JSON error without database details", async () => {
