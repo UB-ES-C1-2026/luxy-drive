@@ -203,6 +203,21 @@ con `category` y se aplican los dos filtros. Desde el frontend:
 | Con o sin `location` | `200` | Array de experiencias (o `[]`) |
 | `location` vacía, solo espacios o de más de 100 caracteres | `400` | `{ "error": "invalid_location" }` |
 
+### Filtro por fecha de servicio (US-005.b)
+
+`GET /api/experiences?from=YYYY-MM-DD&to=YYYY-MM-DD` devuelve las experiencias
+disponibles con fecha de servicio entre esos dos días en hora de Madrid
+(`Europe/Madrid`, con sus cambios de horario), **ambos incluidos**: el rango va desde
+las 00:00 de `from` hasta las 23:59:59 de `to`. Se puede usar solo `from` o solo `to`,
+y se combina con `category` y `location`. Desde el frontend:
+`client.api.experiences.$get({ query: { from: "2026-11-10", to: "2026-11-12" } })`.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Rango válido, o solo `from` o solo `to` | `200` | Array de experiencias (o `[]`) |
+| Fecha mal formada o inexistente (`2026-02-30`, `15/06/2026`, vacía) | `400` | `{ "error": "invalid_date" }` |
+| `to` anterior a `from` | `400` | `{ "error": "invalid_date_range" }` |
+
 ### API de detalle (US-002.b)
 
 `GET /api/experiences/:id` devuelve el mismo objeto que el catálogo más `description`,

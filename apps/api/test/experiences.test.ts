@@ -181,6 +181,82 @@ it.each(["", "   ", "x".repeat(101)])("rejects an invalid location: %j", async (
   expect(await response.json()).toEqual({ error: "invalid_location" });
 });
 
+const at = (iso: string) => Date.parse(iso) / 1000;
+
+async function idsFor(query: string) {
+  const response = await SELF.fetch(`${url}?${query}`);
+  expect(response.status).toBe(200);
+  return ((await response.json()) as { id: number }[]).map((experience) => experience.id);
+}
+
+it("includes the first and last day of the range in Madrid time (summer)", async () => {
+  await insert({ id: 1, serviceAt: at("2030-06-09T21:59:59Z") }); // 09/06 23:59:59 Madrid
+  await insert({ id: 2, serviceAt: at("2030-06-09T22:00:00Z") }); // 10/06 00:00 Madrid
+  await insert({ id: 3, serviceAt: at("2030-06-12T21:59:59Z") }); // 12/06 23:59:59 Madrid
+  await insert({ id: 4, serviceAt: at("2030-06-12T22:00:00Z") }); // 13/06 00:00 Madrid
+  expect(await idsFor("from=2030-06-10&to=2030-06-12")).toEqual([2, 3]);
+});
+
+it("uses the winter offset of Madrid", async () => {
+  await insert({ id: 1, serviceAt: at("2030-01-14T22:59:59Z") });
+  await insert({ id: 2, serviceAt: at("2030-01-14T23:00:00Z") });
+  await insert({ id: 3, serviceAt: at("2030-01-15T22:59:59Z") });
+  await insert({ id: 4, serviceAt: at("2030-01-15T23:00:00Z") });
+  expect(await idsFor("from=2030-01-15&to=2030-01-15")).toEqual([2, 3]);
+});
+
+it("handles the day Madrid changes to summer time", async () => {
+  await insert({ id: 1, serviceAt: at("2030-03-30T22:59:59Z") });
+  await insert({ id: 2, serviceAt: at("2030-03-30T23:00:00Z") });
+  await insert({ id: 3, serviceAt: at("2030-03-31T21:59:59Z") });
+  await insert({ id: 4, serviceAt: at("2030-03-31T22:00:00Z") });
+  expect(await idsFor("from=2030-03-31&to=2030-03-31")).toEqual([2, 3]);
+});
+
+it("accepts only one end of the range", async () => {
+  await insert({ id: 1, serviceAt: at("2030-06-01T10:00:00Z") });
+  await insert({ id: 2, serviceAt: at("2030-06-20T10:00:00Z") });
+  expect(await idsFor("from=2030-06-10")).toEqual([2]);
+  expect(await idsFor("to=2030-06-10")).toEqual([1]);
+});
+
+it("combines dates with category and location", async () => {
+  await insert({
+    id: 1,
+    category: "yacht",
+    location: "Ibiza",
+    serviceAt: at("2030-06-11T10:00:00Z"),
+  });
+  await insert({
+    id: 2,
+    category: "jet",
+    location: "Ibiza",
+    serviceAt: at("2030-06-11T10:00:00Z"),
+  });
+  await insert({
+    id: 3,
+    category: "yacht",
+    location: "Ibiza",
+    serviceAt: at("2030-06-20T10:00:00Z"),
+  });
+  expect(await idsFor("from=2030-06-10&to=2030-06-12&category=yacht&location=ibiza")).toEqual([1]);
+});
+
+it("rejects a range where to is before from", async () => {
+  const response = await SELF.fetch(`${url}?from=2030-06-12&to=2030-06-10`);
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({ error: "invalid_date_range" });
+});
+
+it.each(["from=2030-13-01", "from=2030-02-30", "to=15/06/2030", "to=2030-6-1", "from="])(
+  "rejects a malformed date: %s",
+  async (query) => {
+    const response = await SELF.fetch(`${url}?${query}`);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "invalid_date" });
+  },
+);
+
 it("returns a JSON error without database details", async () => {
   vi.spyOn(env.DB, "prepare").mockImplementation(() => {
     throw new Error("private database details");
