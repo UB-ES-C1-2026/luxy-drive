@@ -190,6 +190,19 @@ disponibles de esa categoría, con el mismo objeto y orden que el catálogo. Sin
 | Categoría válida o sin `category` | `200` | Array de experiencias (o `[]`) |
 | Categoría no válida (incluye vacía o en mayúsculas) | `400` | `{ "error": "invalid_category" }` |
 
+### Filtro por ciudad (US-004.b)
+
+`GET /api/experiences?location=<ciudad>` devuelve las experiencias disponibles cuya
+ubicación contiene ese texto, sin distinguir mayúsculas ni acentos: "malaga" devuelve
+lo mismo que "Málaga", y "palma" encuentra también la ruta "Madrid → Palma". Se combina
+con `category` y se aplican los dos filtros. Desde el frontend:
+`client.api.experiences.$get({ query: { location: "malaga", category: "yacht" } })`.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Con o sin `location` | `200` | Array de experiencias (o `[]`) |
+| `location` vacía, solo espacios o de más de 100 caracteres | `400` | `{ "error": "invalid_location" }` |
+
 ### API de detalle (US-002.b)
 
 `GET /api/experiences/:id` devuelve el mismo objeto que el catálogo más `description`,
