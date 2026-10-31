@@ -1,11 +1,13 @@
 import { Hono } from "hono";
 import type { Bindings } from "./env";
 import { experiences } from "./routes/experiences";
+import { offers } from "./routes/offers";
 
 const app = new Hono<{ Bindings: Bindings }>().basePath("/api");
 
 const routes = app
   .route("/experiences", experiences)
+  .route("/offers", offers)
   .get("/health", async (c) => {
     try {
       await c.env.DB.prepare("SELECT 1").first();

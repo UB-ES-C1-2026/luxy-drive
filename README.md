@@ -235,6 +235,43 @@ y se combina con `category` y `location`. Desde el frontend:
 Una experiencia sin publicar responde como inexistente para no revelar borradores.
 "Disponible" sigue la definición del modelo, con `now` calculado una vez por petición.
 
+### API de ofertas (JS-001.b)
+
+`GET /api/offers` devuelve `200` con las experiencias que tienen una oferta flash
+(`last_minute`) o empty-leg activa, ordenadas por la que caduca antes y después `id`.
+Sin ofertas devuelve `[]`. Desde el frontend: `client.api.offers.$get()`.
+
+Una experiencia aparece si está **disponible** (definición de US-001), su `offer_type` es
+`last_minute` o `empty_leg` y tiene un precio original mayor que el actual. Devuelve el
+mismo objeto que el catálogo más `originalPrice` y `offerExpiresAt`:
+
+```json
+[
+  {
+    "id": 3,
+    "title": "Escapada a Ibiza de última hora",
+    "category": "jet",
+    "location": "Valencia → Ibiza",
+    "serviceAt": "2026-11-01T12:00:00.000Z",
+    "price": 4800,
+    "originalPrice": 6900,
+    "currency": "EUR",
+    "priceUnit": "experiencia completa",
+    "offerType": "last_minute",
+    "offerExpiresAt": "2026-10-31T12:00:00.000Z"
+  }
+]
+```
+
+`price` es el precio con descuento y `originalPrice` el de antes, los dos en EUR por la
+experiencia completa (encajan con `price` y `originalPrice` de `ListingCard`).
+`offerExpiresAt` es ISO 8601 UTC: presentar en `Europe/Madrid`. Un fallo interno devuelve
+`500` y `{ "error": "internal_error" }`.
+
+En la base de datos, `original_price_cents` (migración `add_offer_original_price`) guarda el
+precio antes del descuento; `price_cents` sigue siendo el precio que se paga y `NULL`
+significa que no hay descuento.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
