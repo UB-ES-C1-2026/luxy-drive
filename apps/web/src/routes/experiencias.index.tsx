@@ -22,7 +22,7 @@ import { client } from "../api";
 
 export const Route = createFileRoute("/experiencias/")({
   loader: async () => {
-    const res = await client.api.experiences.$get();
+    const res = await client.api.experiences.$get({ query: {} });
     if (!res.ok) throw new Error("experiences_unavailable");
     return res.json();
   },

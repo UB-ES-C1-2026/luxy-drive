@@ -178,6 +178,18 @@ El frontend puede usar `client.api.experiences.$get()`; el tipo se deriva de `Ap
 Un fallo interno devuelve `500` y `{ "error": "internal_error" }`, sin detalles de D1.
 El seed y las pantallas se implementan en sus tareas correspondientes.
 
+### Filtro por categoría (US-003.b)
+
+`GET /api/experiences?category=jet|yacht|camper` devuelve solo las experiencias
+disponibles de esa categoría, con el mismo objeto y orden que el catálogo. Sin
+`category` devuelve todas. Desde el frontend:
+`client.api.experiences.$get({ query: { category: "yacht" } })`.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Categoría válida o sin `category` | `200` | Array de experiencias (o `[]`) |
+| Categoría no válida (incluye vacía o en mayúsculas) | `400` | `{ "error": "invalid_category" }` |
+
 ### API de detalle (US-002.b)
 
 `GET /api/experiences/:id` devuelve el mismo objeto que el catálogo más `description`,
