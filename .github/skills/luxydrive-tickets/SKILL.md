@@ -5,7 +5,9 @@ description: Redacta tarjetas de Trello (historias de usuario COMO / QUIERO / PA
 
 # LuxyDrive: tarjetas de Trello e issues de GitHub
 
-Hay dos formatos fijos: la **tarjeta de Trello**, que es un elemento del backlog, y la **issue de GitHub**, que es una tarea. No cambies los campos ni su orden.
+Hay dos formatos fijos: la **tarjeta de Trello**, que es una historia de usuario, y la **issue de GitHub**, que es una tarea o un elemento técnico. No cambies los campos ni su orden.
+
+**En Trello solo hay historias de usuario** (`US`, `JS` y épicas). Todo lo demás (`TR`, `SP`, `DD`, `TD`, `BUG`) vive solo como issue de GitHub, en el GitHub Project.
 
 ## Contexto del producto
 
@@ -21,20 +23,20 @@ Roles:
 
 El backlog incluye todo el trabajo que le cuesta tiempo al equipo, no solo historias. Cada elemento tiene un código:
 
-| Código | Elemento |
-| --- | --- |
-| `US-xxx` | Historia de usuario |
-| `JS-xxx` | Job story |
-| `TR-xxx` | Requisito técnico o restricción |
-| `SP-xxx` | Spike de investigación |
-| `DD-xxx` | Decisión o cambio de diseño, cuando es un elemento propio. Si solo afecta a una historia, va como tarea de esa historia. |
-| `TD-xxx` | Deuda técnica |
-| `BUG-xxx` | Bug |
+| Código | Elemento | Dónde vive |
+| --- | --- | --- |
+| `US-xxx` | Historia de usuario | Trello + issues de sus tareas |
+| `JS-xxx` | Job story | Trello + issues de sus tareas |
+| `TR-xxx` | Requisito técnico o restricción | Solo GitHub |
+| `SP-xxx` | Spike de investigación | Solo GitHub |
+| `DD-xxx` | Decisión o cambio de diseño, cuando es un elemento propio. Si solo afecta a una historia, va como tarea de esa historia. | Solo GitHub |
+| `TD-xxx` | Deuda técnica | Solo GitHub |
+| `BUG-xxx` | Bug | Solo GitHub |
 
 - **Tareas:** cada una toma el código de su elemento más una letra: `US-001.a`, `US-001.b`, `SP-001.a`…
 - **Tamaño de una historia:** debe poder completarse en un sprint, con unos 3-4 días de trabajo en total hasta "hecho". Si no cabe, divídela.
 - **Una issue por tarea.**
-- **El mismo código en todas partes:** tarjeta de Trello, issue, rama (`feature/<código>-slug`), PR, Excel de carga de trabajo y demo.
+- **El mismo código en todas partes:** tarjeta de Trello (si es una historia), issue, rama (`feature/<código>-slug`), PR, Excel de carga de trabajo y demo.
 
 ## Tarjeta de Trello (historia de usuario)
 
@@ -60,8 +62,7 @@ Scenario: <nombre>
 
 - **Job story:** si una situación concreta es lo que dispara la necesidad, usa `CUANDO <situación>, QUIERO <motivación>, PARA PODER <resultado esperado>` con código `JS-xxx`. El resto de campos no cambia.
 - **Epic:** usa COMO / QUIERO / PARA igual que una historia, con `Granularidad: Épica`. Las historias en que se dividirá van en un checklist "División prevista" y el resultado esperado, en un único criterio dentro del checklist "Criterios de aceptación".
-- **TR, SP, DD, TD y BUG:** no usan COMO / QUIERO / PARA. Lleva el código, el título, una descripción en texto plano, la prioridad y al menos un criterio de aceptación.
-- **BUG:** en la descripción indica qué ocurre, qué se esperaba, cómo reproducirlo y qué historia afecta.
+- **TR, SP, DD, TD y BUG no van a Trello.** Se escriben como issue de GitHub (ver más abajo).
 
 ### Reglas de la historia
 
@@ -71,7 +72,7 @@ Scenario: <nombre>
 - La parte **PARA** es obligatoria y dice el valor que se entrega.
 - Un solo rol y una sola necesidad por historia. Que sea corta, y que la interfaz quede fuera el mayor tiempo posible.
 - Escribe historias, no tareas: parte del objetivo de cada rol.
-- **No todo es una historia.** Hay cosas que no caben en COMO / QUIERO / PARA y no se fuerzan: van en texto plano con su propio código.
+- **No todo es una historia.** Hay cosas que no caben en COMO / QUIERO / PARA y no se fuerzan: van como issue de GitHub, en texto plano, con su propio código. Nunca como tarjeta de Trello.
   - Cambios de requisito.
   - Restricciones (rendimiento, stack, base de datos) y requisitos técnicos (protocolos, seguridad, cumplimiento normativo): `TR`.
   - Investigación: `SP`.
@@ -81,12 +82,12 @@ Scenario: <nombre>
 
 ### Reglas de los criterios de aceptación
 
-- Al menos uno por elemento del backlog; mejor entre 2 y 4. Se escriben antes de implementar.
+- Al menos uno por historia; mejor entre 2 y 4. Se escriben antes de implementar.
 - Cada criterio se puede probar por separado y tiene un resultado claro de PASS o FAIL.
 - Describen el resultado final (el QUÉ), no el enfoque de la solución (el CÓMO).
 - Incluyen criterios funcionales y, cuando aplique, no funcionales: rendimiento, accesibilidad, diseño adaptable y estados vacío o de error.
 - Siempre en Gherkin: Given [contexto] / When [acción] / Then [resultado esperado].
-- **Los criterios viven en Trello.** Ponlos como checklist en la tarjeta y márcalos solo cuando pasen.
+- **Los criterios viven en Trello.** Ponlos como checklist "Criterios de aceptación" en la tarjeta, uno por ítem, y márcalos solo cuando pasen (PASS) en staging. Una historia no está terminada con criterios sin marcar, y nunca se marca uno que no se ha probado.
 
 ### Granularidad del backlog (DEEP)
 
@@ -101,7 +102,7 @@ Scenario: <nombre>
 
 - **El orden manda.** La posición en la lista del Product Backlog es la prioridad real: el equipo tira siempre de la tarjeta de más arriba. Se ordena por ROI = Value Points / Story Points × 1/Riesgo; si una historia depende de otras, se usa el ROI de la cadena y sus prerrequisitos van justo encima.
 - **La etiqueta dice si el producto la necesita**, no cuándo se hace: `Highest` bloquea el resto del trabajo (spikes y requisitos técnicos de base), `High` es imprescindible para el producto final, `Medium` es conveniente, `Low` entra si hay tiempo y `Lowest` es opcional. Una historia `Medium` barata puede ir por delante de una `High` cara.
-- **Una sola escala** en todas partes: la etiqueta de Trello, la línea `Prioridad` de la tarjeta y el campo `Priority` del GitHub Project usan los mismos cinco valores.
+- **Una sola escala** en todas partes: la etiqueta de Trello de las historias, la línea `Prioridad` de la tarjeta y el campo `Priority` del GitHub Project usan los mismos cinco valores.
 
 ## Issue de GitHub (tarea)
 
@@ -127,6 +128,8 @@ Significado de cada tipo de delegación:
 - **Mixta:** el agente propone y una persona decide.
 - **Delegable:** la puede hacer el agente.
 
+**Elementos técnicos (TR, SP, DD, TD y BUG):** son issues propias, sin tarjeta de Trello. Usan la misma plantilla, con una descripción en texto plano, la `Priority` en el Project y al menos un criterio comprobable. En un `BUG`, la descripción dice qué ocurre, qué se esperaba, cómo reproducirlo y qué historia afecta.
+
 Ejemplo:
 
 ```markdown
@@ -146,7 +149,7 @@ Delegación: Delegable · US-001
 
 La rúbrica evalúa que Trello, el Excel, GitHub y la demo cuenten lo mismo.
 
-- **De dónde salen los criterios:** los de una issue salen de los criterios de aceptación de su tarjeta de Trello, sin contradecirlos ni añadir requisitos nuevos. Si la tarjeta no tiene criterios, pídelos antes de crear la issue.
+- **De dónde salen los criterios:** los de la issue de una tarea de historia salen de los criterios de aceptación de su tarjeta de Trello, sin contradecirlos ni añadir requisitos nuevos. Si la tarjeta no tiene criterios, pídelos antes de crear la issue.
 - **Tests de aceptación:** una tarea de este tipo cubre todos los criterios de su historia. Escribe "todos los criterios de US-xxx", no un número, y anota el resultado PASS o FAIL de cada uno en la tarjeta.
 - **Si cambia la tarjeta,** actualiza sus issues en el mismo momento.
 

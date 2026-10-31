@@ -10,14 +10,14 @@ Marketplace de experiencias en vehículos de lujo (jets privados, yates y autoca
 
 ## Equipo
 
-| Persona | Rol Scrum | Rol técnico (Sprint 0) |
-| --- | --- | --- |
-| Alba Cano Iglesias | Product Owner | Frontend |
-| Roger Ayala | Scrum Master | Backend |
-| Adam | — | DevOps |
-| Ignacio Martínez Allué | — | Backend |
-| Fedor Gorshkov | — | Frontend |
-| Muqaddam Ahmad Mehmood Ashraf | — | QA |
+| Persona | GitHub | Rol Scrum | Rol técnico (Sprint 0) | Rol técnico (Sprint 1) |
+| --- | --- | --- | --- | --- |
+| Alba Cano Iglesias | `albacano` | Product Owner | Frontend | Backend |
+| Roger Ayala | `RogerAyala` | Scrum Master | Backend | Frontend |
+| Adam El Messaoudi Aarab | `mimissuri` | — | DevOps | Frontend |
+| Ignacio Martínez Allué | `igna-mtz` | — | Backend | DevOps |
+| Fedor Gorshkov | `fedorgor133` | — | Frontend | QA |
+| Muqaddam Ahmad Mehmood Ashraf | `Aduhax16` | — | QA | Backend |
 
 - **Product Owner:** escribe las user stories en Trello (con criterios de aceptación), crea las issues en GitHub y acepta lo terminado.
 - **Scrum Master:** coordina el equipo, lleva el Excel del sprint y vigila que Trello, issues y Excel cuadren.
