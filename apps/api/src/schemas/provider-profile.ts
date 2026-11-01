@@ -16,7 +16,7 @@ const codes = {
   phone: "invalid_phone",
 } as const;
 
-export function profileError(error: z.ZodError) {
+export function profileError(error: z.core.$ZodError) {
   const field = (Object.keys(codes) as (keyof typeof codes)[]).find((f) =>
     error.issues.some((issue) => issue.path[0] === f),
   );
