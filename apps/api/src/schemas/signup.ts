@@ -9,7 +9,7 @@ export const signupBody = z.object({
 
 const fields = ["name", "email", "password"] as const;
 
-export function signupError(error: z.ZodError) {
+export function signupError(error: z.core.$ZodError) {
   const field = fields.find((f) => error.issues.some((issue) => issue.path[0] === f));
   return field ? (`invalid_${field}` as const) : ("invalid_body" as const);
 }
