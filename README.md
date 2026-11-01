@@ -272,12 +272,123 @@ En la base de datos, `original_price_cents` (migración `add_offer_original_pric
 precio antes del descuento; `price_cents` sigue siendo el precio que se paga y `NULL`
 significa que no hay descuento.
 
+### API de registro de cliente (US-006.b)
+
+`POST /api/auth/signup` con `{ "name", "email", "password" }` crea una cuenta de cliente,
+inicia la sesión (cookie `luxydrive_session`) y devuelve `201` con
+`{ "id", "name", "role": "client" }`. Desde el frontend:
+`client.api.auth.signup.$post({ json: { name, email, password } })`.
+
+- El email se guarda sin espacios y en minúsculas; si ya existe (como cliente o proveedor)
+  responde `409` y `{ "error": "email_exists" }`.
+- Nombre vacío, email no válido o contraseña de menos de 8 caracteres responden `400` con
+  `invalid_name`, `invalid_email` o `invalid_password`.
+- Una petición sin `Origin` o con otro origen responde `403` y `invalid_origin`.
+- Tablas `users` y `sessions` (migración `create_users`), según SP-002. La contraseña se
+  guarda con hash y nunca aparece en respuestas ni logs.
+
+### API de acceso y cierre de sesión (US-007.b)
+
+- `POST /api/auth/login` con `{ "email", "password" }`: si son correctos, inicia una sesión
+  nueva (cookie `luxydrive_session`, 7 días) y devuelve `200` con `{ "id", "name", "role" }`.
+  Contraseña incorrecta y email inexistente responden igual: `401` e `invalid_credentials`.
+  Un cuerpo sin email o contraseña responde `400` e `invalid_body`.
+- `POST /api/auth/logout`: borra la sesión en D1 y caduca la cookie. Responde `204` también sin
+  sesión. Las sesiones de otros dispositivos siguen activas.
+- `GET /api/auth/me`: usuario de la sesión actual (`200` con `{ "id", "name", "role" }`) o `401`
+  y `unauthorized`. Sirve al frontend para proteger las páginas privadas.
+- Desde el frontend: `client.api.auth.login.$post({ json })`, `client.api.auth.logout.$post()`
+  y `client.api.auth.me.$get()`.
+- Las rutas privadas usan el middleware `requireUser` (`apps/api/src/auth/session.ts`), que
+  responde `401` sin sesión válida o con la sesión caducada.
+
+### API de registro de proveedor y rutas de proveedor (US-033.b)
+
+- `POST /api/auth/signup/provider`: igual que el registro de cliente (mismas validaciones,
+  `409 email_exists` si el email ya existe como cliente o proveedor), pero crea la cuenta con
+  rol `provider` e inicia su sesión. Desde el frontend:
+  `client.api.auth.signup.provider.$post({ json: { name, email, password } })`.
+- Las funciones de proveedor se montan en `apps/api/src/routes/provider.ts` y cuelgan de
+  `/api/provider/*`: sin sesión responden `401 unauthorized` y con una cuenta de cliente
+  `403 forbidden`. El rol sale siempre de la sesión en D1, nunca de la petición.
+
+### API de anuncios en borrador (US-009.b)
+
+Un proveedor prepara sus anuncios como borrador y vuelve a ellos más tarde. Todo cuelga
+de `/api/provider/experiences`, detrás de la sesión de proveedor de US-033 (`401` sin
+sesión, `403` a una cuenta de cliente). Las escrituras exigen el `Origin` propio.
+
+| Petición | Respuesta |
+| --- | --- |
+| `POST /api/provider/experiences` con al menos `title` | `201` con el borrador |
+| `GET /api/provider/experiences` | `200` con los anuncios propios (borradores y publicados), del más nuevo al más antiguo |
+| `GET /api/provider/experiences/:id` | `200` con el anuncio propio; `403 forbidden` si es de otro proveedor; `404 not_found` si no existe |
+| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el borrador actualizado; `403` si es de otro; `409 already_published` si ya está publicado |
+
+Campos: `title` (obligatorio, hasta 120 caracteres), y opcionales `description`,
+`category` (`jet`, `yacht` o `camper`), `vehicle`, `location` y `capacity` (entero
+positivo). Un campo no válido responde `400` con `invalid_<campo>`, por ejemplo
+`{ "error": "invalid_title" }`. La respuesta es el anuncio con `status`: `draft` o
+`published`; los campos sin rellenar van a `null`.
+
+Los borradores (`published = 0`) no salen en `GET /api/experiences` ni en el detalle
+público. La propiedad se comprueba en SQL con `provider_id`, no solo con el rol (SP-002).
+
+En la base de datos, la migración `experience_drafts` rehace la tabla `experiences`:
+todos los campos salvo `title` pasan a ser opcionales, se añade `provider_id` (`NULL` en
+los datos de demo) y una restricción obliga a que un anuncio publicado tenga todos los
+campos que necesitan el catálogo y el detalle.
+
+### Precio y fecha de servicio del borrador (US-011.b)
+
+`POST` y `PATCH /api/provider/experiences[/:id]` aceptan también:
+
+- `price`: número en EUR por la experiencia completa, mayor o igual que 0 y con dos
+  decimales como máximo. Se guarda en céntimos en `price_cents`.
+- `serviceAt`: fecha y hora **en hora de Madrid** con el formato de un
+  `<input type="datetime-local">`, por ejemplo `"2026-11-10T18:00"`. Se guarda en
+  segundos UTC en `service_at`, teniendo en cuenta el cambio de hora.
+
+La respuesta del anuncio incluye `price`, `currency: "EUR"`,
+`priceUnit: "experiencia completa"` y `serviceAt` en ISO 8601 UTC (`null` si no se ha
+rellenado). Si algo no es válido, no se guarda ningún campo de esa petición:
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Precio negativo, con más de dos decimales o que no es un número | `400` | `{ "error": "invalid_price" }` |
+| Fecha mal escrita o inexistente | `400` | `{ "error": "invalid_service_at" }` |
+| Fecha y hora ya pasadas | `400` | `{ "error": "service_at_in_past" }` |
+
+### Publicar un anuncio (US-010.b)
+
+`POST /api/provider/experiences/:id/publish` hace público un borrador propio. Queda
+disponible en el catálogo a su precio normal: oferta `standard` activa hasta la fecha de
+servicio, según la definición de «disponible» de US-001.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Borrador propio completo con fecha futura | `200` | El anuncio con `status: "published"` |
+| Faltan campos | `400` | `{ "error": "missing_fields", "fields": ["price", "serviceAt", …] }` |
+| La fecha de servicio ya ha pasado | `400` | `{ "error": "service_at_in_past" }` |
+| Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` |
+| Ya publicado | `409` | `{ "error": "already_published" }` |
+| No existe | `404` | `{ "error": "not_found" }` |
+
+Para publicar hacen falta el precio y la fecha de servicio, y también lo que muestran el
+catálogo y el detalle: `description`, `category`, `vehicle`, `location` y `capacity`.
+`fields` los lista todos, con el precio y la fecha primero. Si no se publica, el anuncio
+sigue siendo un borrador oculto.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
 
 - Secret `CLOUDFLARE_API_TOKEN`: token con permisos de Workers, D1 y R2 de la cuenta.
 - Variable `CLOUDFLARE_ACCOUNT_ID`.
+- Secret de Workers `AUTH_PEPPER` en `dev`, `staging` y `production`: valor aleatorio de al menos
+  32 bytes y distinto en cada entorno (SP-002). Sin él, registro y login responden `500`. Lo
+  configura DevOps con `wrangler secret put AUTH_PEPPER --env <entorno>`; en local va en
+  `apps/api/.dev.vars` (`AUTH_PEPPER=...`).
 - Configuración de los tres entornos: `apps/api/wrangler.jsonc`.
 
 | Workflow | Disparador |
