@@ -1,11 +1,13 @@
 import { Hono } from "hono";
 import type { Bindings } from "./env";
+import { auth } from "./routes/auth";
 import { experiences } from "./routes/experiences";
 import { offers } from "./routes/offers";
 
 const app = new Hono<{ Bindings: Bindings }>().basePath("/api");
 
 const routes = app
+  .route("/auth", auth)
   .route("/experiences", experiences)
   .route("/offers", offers)
   .get("/health", async (c) => {

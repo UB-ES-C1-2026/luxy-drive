@@ -294,12 +294,31 @@ En la base de datos, `original_price_cents` (migración `add_offer_original_pric
 precio antes del descuento; `price_cents` sigue siendo el precio que se paga y `NULL`
 significa que no hay descuento.
 
+### API de registro de cliente (US-006.b)
+
+`POST /api/auth/signup` con `{ "name", "email", "password" }` crea una cuenta de cliente,
+inicia la sesión (cookie `luxydrive_session`) y devuelve `201` con
+`{ "id", "name", "role": "client" }`. Desde el frontend:
+`client.api.auth.signup.$post({ json: { name, email, password } })`.
+
+- El email se guarda sin espacios y en minúsculas; si ya existe (como cliente o proveedor)
+  responde `409` y `{ "error": "email_exists" }`.
+- Nombre vacío, email no válido o contraseña de menos de 8 caracteres responden `400` con
+  `invalid_name`, `invalid_email` o `invalid_password`.
+- Una petición sin `Origin` o con otro origen responde `403` y `invalid_origin`.
+- Tablas `users` y `sessions` (migración `create_users`), según SP-002. La contraseña se
+  guarda con hash y nunca aparece en respuestas ni logs.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
 
 - Secret `CLOUDFLARE_API_TOKEN`: token con permisos de Workers, D1 y R2 de la cuenta.
 - Variable `CLOUDFLARE_ACCOUNT_ID`.
+- Secret de Workers `AUTH_PEPPER` en `dev`, `staging` y `production`: valor aleatorio de al menos
+  32 bytes y distinto en cada entorno (SP-002). Sin él, registro y login responden `500`. Lo
+  configura DevOps con `wrangler secret put AUTH_PEPPER --env <entorno>`; en local va en
+  `apps/api/.dev.vars` (`AUTH_PEPPER=...`).
 - Configuración de los tres entornos: `apps/api/wrangler.jsonc`.
 
 | Workflow | Disparador |
