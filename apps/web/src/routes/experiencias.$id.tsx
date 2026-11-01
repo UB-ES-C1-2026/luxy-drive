@@ -9,6 +9,7 @@ import {
   CircleAlert,
   Container,
   EmptyState,
+  formatPriceCents,
   Heading,
   type ListingCategory,
   ListingPhoto,
@@ -28,6 +29,7 @@ import {
 import { createFileRoute, createLink, Link, useRouter } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { client } from "../api";
+import { splitPrice } from "../price";
 
 export const Route = createFileRoute("/experiencias/$id")({
   loader: async ({ params }) => {
@@ -80,6 +82,29 @@ const serviceTime = new Intl.DateTimeFormat("es-ES", {
 function formatService(iso: string) {
   const date = new Date(iso);
   return `${serviceDay.format(date)} · ${serviceTime.format(date)}`;
+}
+
+const persons = (n: number) => (n === 1 ? "1 persona" : `${n} personas`);
+
+// Precio por persona con la capacidad completa. Si no sale exacto a céntimos, se dice
+// cuántas personas pagan un céntimo menos para que la suma sea el precio total.
+function PerPersonPrice({ price, capacity }: { price: number; capacity: number }) {
+  const { base, higher, extra } = splitPrice(price, capacity);
+  const rest = capacity - extra;
+
+  return (
+    <>
+      <p>
+        {formatPriceCents(extra > 0 ? higher : base)} por persona ({persons(capacity)})
+      </p>
+      {extra > 0 && (
+        <p>
+          {rest === 1 ? "1 persona paga" : `${rest} personas pagan`} {formatPriceCents(base)} para
+          que la suma sea exactamente el total.
+        </p>
+      )}
+    </>
+  );
 }
 
 function ExperienceDetail() {
@@ -144,6 +169,7 @@ function ExperienceDetail() {
         <BookingCard
           price={experience.price}
           priceUnit={experience.priceUnit}
+          priceDetail={<PerPersonPrice price={experience.price} capacity={experience.capacity} />}
           className="md:sticky md:top-6 md:col-start-2 md:row-span-2 md:row-start-2 md:self-start"
         />
 
