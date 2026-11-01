@@ -72,6 +72,7 @@ export const Route = createFileRoute("/experiencias/")({
 });
 
 const CatalogButton = createLink(ButtonLink);
+const OffersButton = createLink(ButtonLink);
 
 const categoryLabel: Record<ListingCategory, string> = {
   jet: "Jet privado",
@@ -361,6 +362,12 @@ function CatalogPage({ subtitle, children }: { subtitle?: string; children: Reac
           </Link>
         }
         center={<CategoryFilter />}
+        actions={
+          <OffersButton to="/ofertas" variant="secondary" size="sm" className="mb-3 md:mb-0">
+            <Sparkles aria-hidden className="size-4" />
+            Ver ofertas
+          </OffersButton>
+        }
       />
       <main>
         <Container size="wide">
