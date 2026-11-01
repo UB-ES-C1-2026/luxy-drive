@@ -359,6 +359,26 @@ rellenado). Si algo no es válido, no se guarda ningún campo de esa petición:
 | Fecha mal escrita o inexistente | `400` | `{ "error": "invalid_service_at" }` |
 | Fecha y hora ya pasadas | `400` | `{ "error": "service_at_in_past" }` |
 
+### Publicar un anuncio (US-010.b)
+
+`POST /api/provider/experiences/:id/publish` hace público un borrador propio. Queda
+disponible en el catálogo a su precio normal: oferta `standard` activa hasta la fecha de
+servicio, según la definición de «disponible» de US-001.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Borrador propio completo con fecha futura | `200` | El anuncio con `status: "published"` |
+| Faltan campos | `400` | `{ "error": "missing_fields", "fields": ["price", "serviceAt", …] }` |
+| La fecha de servicio ya ha pasado | `400` | `{ "error": "service_at_in_past" }` |
+| Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` |
+| Ya publicado | `409` | `{ "error": "already_published" }` |
+| No existe | `404` | `{ "error": "not_found" }` |
+
+Para publicar hacen falta el precio y la fecha de servicio, y también lo que muestran el
+catálogo y el detalle: `description`, `category`, `vehicle`, `location` y `capacity`.
+`fields` los lista todos, con el precio y la fecha primero. Si no se publica, el anuncio
+sigue siendo un borrador oculto.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.

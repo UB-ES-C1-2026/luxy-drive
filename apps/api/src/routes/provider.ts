@@ -55,6 +55,18 @@ const validDraft = <T extends typeof draftBody | typeof draftChanges>(schema: T)
     if (!result.success) return c.json({ error: draftError(result.error) }, 400);
   });
 
+// What the catalog and the detail show; the database also refuses a published listing
+// without them. Price and service date come first: they are the usual ones (US-010).
+const REQUIRED_TO_PUBLISH = [
+  ["price_cents", "price"],
+  ["service_at", "serviceAt"],
+  ["description", "description"],
+  ["category", "category"],
+  ["vehicle", "vehicle"],
+  ["location", "location"],
+  ["capacity", "capacity"],
+] as const satisfies readonly (readonly [keyof ListingRow, string])[];
+
 // Price in cents and service time in Unix seconds, or a 400 telling what to fix.
 function priceAndDate(changes: { price?: number; serviceAt?: string }) {
   const priceCents = changes.price === undefined ? null : Math.round(changes.price * 100);
@@ -168,6 +180,46 @@ export const provider = new Hono<AuthEnv>()
       if (!existing) return c.json({ error: "not_found" } as const, 404);
       if (existing.provider_id !== userId) return c.json({ error: "forbidden" } as const, 403);
       return c.json({ error: "already_published" } as const, 409);
+    } catch {
+      return c.json({ error: "internal_error" } as const, 500);
+    }
+  })
+  .post("/experiences/:id/publish", validId, async (c) => {
+    const { id } = c.req.valid("param");
+    const userId = c.get("user").id;
+    const now = Math.floor(Date.now() / 1000);
+    try {
+      const row = await c.env.DB.prepare(`SELECT ${LISTING_COLUMNS} FROM experiences WHERE id = ?`)
+        .bind(id)
+        .first<ListingRow>();
+      if (!row) return c.json({ error: "not_found" } as const, 404);
+      if (row.provider_id !== userId) return c.json({ error: "forbidden" } as const, 403);
+      if (row.published === 1) return c.json({ error: "already_published" } as const, 409);
+
+      const missing = REQUIRED_TO_PUBLISH.filter(([column]) => row[column] === null).map(
+        ([, field]) => field,
+      );
+      if (missing.length > 0) {
+        return c.json({ error: "missing_fields" as const, fields: missing }, 400);
+      }
+      if ((row.service_at ?? 0) <= now) {
+        return c.json({ error: "service_at_in_past" } as const, 400);
+      }
+
+      // Published at its normal price: a standard offer active until the service starts,
+      // so it is "available" as defined in US-001. The WHERE repeats the checks above
+      // in case the draft changed in between.
+      const published = await c.env.DB.prepare(
+        `UPDATE experiences
+         SET published = 1, offer_active = 1, offer_type = 'standard',
+             offer_expires_at = service_at
+         WHERE id = ? AND provider_id = ? AND published = 0 AND service_at > ?
+         RETURNING ${LISTING_COLUMNS}`,
+      )
+        .bind(id, userId, now)
+        .first<ListingRow>();
+      if (!published) return c.json({ error: "already_published" } as const, 409);
+      return c.json(toListing(published), 200);
     } catch {
       return c.json({ error: "internal_error" } as const, 500);
     }
