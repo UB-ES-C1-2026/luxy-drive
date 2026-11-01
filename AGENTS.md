@@ -11,7 +11,7 @@ Reglas obligatorias para cualquier agente (Claude Code, Codex, Cursor, Copilot�
 
 ## Flujo
 
-1. **Una tarea = una rama = una PR contra `staging`.** Crea la rama desde `staging` con el formato `feature/<ID>-slug`, `fix/<ID>-slug` o `chore/slug`. `<ID>` es el de la tarjeta de Trello.
+1. **Una historia = una rama = una PR contra `staging`.** Crea desde `staging` una rama `feature/US-006-registro-cliente` o `feature/JS-001-ofertas`, sin letra de tarea. Cada tarea conserva su issue; sus responsables colaboran con commits separados en la rama compartida, sin force-push sobre trabajo ajeno. Mantén la PR en borrador hasta completar y verificar las tareas; incluye un `Closes #n` por issue resuelta. Para elementos técnicos sin historia usa su código (`chore/SP-002-auth-decisions`, `chore/TR-003-story-branches`, `fix/BUG-xxx-slug`). Las PRs ya abiertas continúan su revisión sin renombrarlas o agruparlas retroactivamente.
 2. **Antes de programar, ten los criterios de aceptación.** Si no los tienes, pídelos. No inventes requisitos.
 3. **Haz solo lo que pide la tarea.** Nada de refactors, renombrados ni dependencias de paso.
 4. **Para dar algo por terminado**, esto tiene que pasar entero:
