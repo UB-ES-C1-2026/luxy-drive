@@ -312,6 +312,33 @@ inicia la sesión (cookie `luxydrive_session`) y devuelve `201` con
   `/api/provider/*`: sin sesión responden `401 unauthorized` y con una cuenta de cliente
   `403 forbidden`. El rol sale siempre de la sesión en D1, nunca de la petición.
 
+### API de anuncios en borrador (US-009.b)
+
+Un proveedor prepara sus anuncios como borrador y vuelve a ellos más tarde. Todo cuelga
+de `/api/provider/experiences`, detrás de la sesión de proveedor de US-033 (`401` sin
+sesión, `403` a una cuenta de cliente). Las escrituras exigen el `Origin` propio.
+
+| Petición | Respuesta |
+| --- | --- |
+| `POST /api/provider/experiences` con al menos `title` | `201` con el borrador |
+| `GET /api/provider/experiences` | `200` con los anuncios propios (borradores y publicados), del más nuevo al más antiguo |
+| `GET /api/provider/experiences/:id` | `200` con el anuncio propio; `403 forbidden` si es de otro proveedor; `404 not_found` si no existe |
+| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el borrador actualizado; `403` si es de otro; `409 already_published` si ya está publicado |
+
+Campos: `title` (obligatorio, hasta 120 caracteres), y opcionales `description`,
+`category` (`jet`, `yacht` o `camper`), `vehicle`, `location` y `capacity` (entero
+positivo). Un campo no válido responde `400` con `invalid_<campo>`, por ejemplo
+`{ "error": "invalid_title" }`. La respuesta es el anuncio con `status`: `draft` o
+`published`; los campos sin rellenar van a `null`.
+
+Los borradores (`published = 0`) no salen en `GET /api/experiences` ni en el detalle
+público. La propiedad se comprueba en SQL con `provider_id`, no solo con el rol (SP-002).
+
+En la base de datos, la migración `experience_drafts` rehace la tabla `experiences`:
+todos los campos salvo `title` pasan a ser opcionales, se añade `provider_id` (`NULL` en
+los datos de demo) y una restricción obliga a que un anuncio publicado tenga todos los
+campos que necesitan el catálogo y el detalle.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
