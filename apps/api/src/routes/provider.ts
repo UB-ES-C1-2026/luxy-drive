@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import { type AuthEnv, requireRole, requireUser, sameOrigin } from "../auth/session";
+import { madridLocalToUnix } from "../madrid-time";
 import { draftBody, draftChanges, draftError } from "../schemas/draft";
 
 type ListingRow = {
@@ -13,11 +14,13 @@ type ListingRow = {
   vehicle: string | null;
   location: string | null;
   capacity: number | null;
+  price_cents: number | null;
+  service_at: number | null;
   published: 0 | 1;
 };
 
 const LISTING_COLUMNS =
-  "id, provider_id, title, description, category, vehicle, location, capacity, published";
+  "id, provider_id, title, description, category, vehicle, location, capacity, price_cents, service_at, published";
 
 function toListing(row: ListingRow) {
   return {
@@ -28,6 +31,10 @@ function toListing(row: ListingRow) {
     vehicle: row.vehicle,
     location: row.location,
     capacity: row.capacity,
+    price: row.price_cents === null ? null : row.price_cents / 100,
+    currency: "EUR" as const,
+    priceUnit: "experiencia completa" as const,
+    serviceAt: row.service_at === null ? null : new Date(row.service_at * 1000).toISOString(),
     status: row.published === 1 ? ("published" as const) : ("draft" as const),
   };
 }
@@ -48,16 +55,27 @@ const validDraft = <T extends typeof draftBody | typeof draftChanges>(schema: T)
     if (!result.success) return c.json({ error: draftError(result.error) }, 400);
   });
 
+// Price in cents and service time in Unix seconds, or a 400 telling what to fix.
+function priceAndDate(changes: { price?: number; serviceAt?: string }) {
+  const priceCents = changes.price === undefined ? null : Math.round(changes.price * 100);
+  const serviceAt = changes.serviceAt === undefined ? null : madridLocalToUnix(changes.serviceAt);
+  const past = serviceAt !== null && serviceAt <= Math.floor(Date.now() / 1000);
+  return { priceCents, serviceAt, past };
+}
+
 // Every provider function hangs from here, behind a provider session.
 export const provider = new Hono<AuthEnv>()
   .use(sameOrigin, requireUser, requireRole("provider"))
   .post("/experiences", validDraft(draftBody), async (c) => {
     const draft = c.req.valid("json");
+    const { priceCents, serviceAt, past } = priceAndDate(draft);
+    if (past) return c.json({ error: "service_at_in_past" } as const, 400);
     try {
       const row = await c.env.DB.prepare(
         `INSERT INTO experiences
-           (provider_id, title, description, category, vehicle, location, capacity, published)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+           (provider_id, title, description, category, vehicle, location, capacity,
+            price_cents, service_at, published)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
          RETURNING ${LISTING_COLUMNS}`,
       )
         .bind(
@@ -68,6 +86,8 @@ export const provider = new Hono<AuthEnv>()
           draft.vehicle ?? null,
           draft.location ?? null,
           draft.capacity ?? null,
+          priceCents,
+          serviceAt,
         )
         .first<ListingRow>();
       if (!row) return c.json({ error: "internal_error" } as const, 500);
@@ -108,6 +128,8 @@ export const provider = new Hono<AuthEnv>()
     const { id } = c.req.valid("param");
     const changes = c.req.valid("json");
     const userId = c.get("user").id;
+    const { priceCents, serviceAt, past } = priceAndDate(changes);
+    if (past) return c.json({ error: "service_at_in_past" } as const, 400);
     try {
       // Ownership and draft state are part of the WHERE: nothing else can be changed.
       const row = await c.env.DB.prepare(
@@ -117,7 +139,9 @@ export const provider = new Hono<AuthEnv>()
              category = COALESCE(?, category),
              vehicle = COALESCE(?, vehicle),
              location = COALESCE(?, location),
-             capacity = COALESCE(?, capacity)
+             capacity = COALESCE(?, capacity),
+             price_cents = COALESCE(?, price_cents),
+             service_at = COALESCE(?, service_at)
          WHERE id = ? AND provider_id = ? AND published = 0
          RETURNING ${LISTING_COLUMNS}`,
       )
@@ -128,6 +152,8 @@ export const provider = new Hono<AuthEnv>()
           changes.vehicle ?? null,
           changes.location ?? null,
           changes.capacity ?? null,
+          priceCents,
+          serviceAt,
           id,
           userId,
         )

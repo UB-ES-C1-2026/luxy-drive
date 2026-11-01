@@ -339,6 +339,26 @@ todos los campos salvo `title` pasan a ser opcionales, se añade `provider_id` (
 los datos de demo) y una restricción obliga a que un anuncio publicado tenga todos los
 campos que necesitan el catálogo y el detalle.
 
+### Precio y fecha de servicio del borrador (US-011.b)
+
+`POST` y `PATCH /api/provider/experiences[/:id]` aceptan también:
+
+- `price`: número en EUR por la experiencia completa, mayor o igual que 0 y con dos
+  decimales como máximo. Se guarda en céntimos en `price_cents`.
+- `serviceAt`: fecha y hora **en hora de Madrid** con el formato de un
+  `<input type="datetime-local">`, por ejemplo `"2026-11-10T18:00"`. Se guarda en
+  segundos UTC en `service_at`, teniendo en cuenta el cambio de hora.
+
+La respuesta del anuncio incluye `price`, `currency: "EUR"`,
+`priceUnit: "experiencia completa"` y `serviceAt` en ISO 8601 UTC (`null` si no se ha
+rellenado). Si algo no es válido, no se guarda ningún campo de esa petición:
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Precio negativo, con más de dos decimales o que no es un número | `400` | `{ "error": "invalid_price" }` |
+| Fecha mal escrita o inexistente | `400` | `{ "error": "invalid_service_at" }` |
+| Fecha y hora ya pasadas | `400` | `{ "error": "service_at_in_past" }` |
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
