@@ -85,6 +85,25 @@ feature/*  ──PR──►  staging  ──PR──►  main  ──tag v*─�
 
 Reglas del equipo: a `staging` y `main` solo se llega por PR con CI en verde y 1 aprobación; `main` solo acepta PRs desde `staging` o `hotfix/*` (el check `source-branch` falla si no); `dev` solo la escribe GitHub Actions. **Nunca hagas push directo a `staging`, `main` ni `dev`.**
 
+### PR vinculada a una issue (TR-004)
+
+Toda PR, incluidas las `chore/`, necesita una issue. Escribe `Closes #28` o
+`Fixes #28` en su descripción, fuera de comentarios HTML y bloques de código.
+Para varias tareas resueltas, usa una referencia por issue. El check
+`issue-reference` falla si falta la referencia y se repite al editar el cuerpo,
+abrir/reabrir la PR o subir commits. No verifica que el cambio resuelva la issue:
+eso sigue siendo responsabilidad de los tests y la revisión humana.
+
+La protección de `staging` debe exigir `issue-reference`, además de CI (`checks`)
+y una aprobación humana. Activación: integrar primero este workflow, actualizar
+las ramas de las PRs abiertas para que lo incluyan y comprobar sus checks; solo
+entonces exigirlo. Así no se bloquean PRs con un check que todavía no pueden emitir.
+No se considera completada TR-004 hasta verificar la protección activa.
+
+Prueba manual sobre una PR propia: quitar la referencia, comprobar el check rojo,
+añadir `Closes #n` y comprobar el verde. No hace falta mergear. Nunca borrar el
+vínculo de una PR ajena para ensayar. Pruebas locales: `node --test scripts/check-pr-issue.test.mjs`.
+
 ## Definition of Done
 
 Una tarea solo pasa a Done cuando cumple todo esto. La [plantilla de PR](.github/pull_request_template.md) ya incluye el checklist.
