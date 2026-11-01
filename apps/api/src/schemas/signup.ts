@@ -13,3 +13,8 @@ export function signupError(error: z.core.$ZodError) {
   const field = fields.find((f) => error.issues.some((issue) => issue.path[0] === f));
   return field ? (`invalid_${field}` as const) : ("invalid_body" as const);
 }
+
+export const loginBody = z.object({
+  email: z.string().trim(),
+  password: z.string(),
+});
