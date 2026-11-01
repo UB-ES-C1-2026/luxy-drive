@@ -12,6 +12,7 @@ export {
   CircleAlert,
   Globe,
   Heart,
+  LayoutGrid,
   type LucideIcon,
   type LucideProps,
   MapPin,
