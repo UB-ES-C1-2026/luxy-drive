@@ -226,6 +226,8 @@ export type BookingCardProps = {
   /** "experiencia completa", "/ persona". */
   priceUnit: string;
   originalPrice?: number;
+  /** Línea bajo el precio (precio por persona, condiciones). */
+  priceDetail?: ReactNode;
   /** Selectores de fecha, ruta y pasajeros. */
   children?: ReactNode;
   /** Desglose de precio; si hay líneas, se muestra el total. */
@@ -244,6 +246,7 @@ export function BookingCard({
   price,
   priceUnit,
   originalPrice,
+  priceDetail,
   children,
   breakdown = [],
   ctaLabel,
@@ -262,16 +265,19 @@ export function BookingCard({
     className,
   );
   const priceLine = (
-    <p className="text-ink">
-      {originalPrice !== undefined && (
-        <span className="mr-2 text-body-md text-muted line-through">
-          <span className="sr-only">Antes </span>
-          {formatPrice(originalPrice)}
-        </span>
-      )}
-      <span className="text-display-md">{formatPrice(price)}</span>{" "}
-      <span className="text-body-md">{priceUnit}</span>
-    </p>
+    <div className="flex flex-col gap-1">
+      <p className="text-ink">
+        {originalPrice !== undefined && (
+          <span className="mr-2 text-body-md text-muted line-through">
+            <span className="sr-only">Antes </span>
+            {formatPrice(originalPrice)}
+          </span>
+        )}
+        <span className="text-display-md">{formatPrice(price)}</span>{" "}
+        <span className="text-body-md">{priceUnit}</span>
+      </p>
+      {priceDetail && <div className="text-body-sm text-muted">{priceDetail}</div>}
+    </div>
   );
 
   // Sin botón no hay nada que enviar: es una tarjeta de precio, no un formulario.
