@@ -20,20 +20,28 @@ import {
   Section,
   Sparkles,
   Text,
+  TextInput,
   TopNav,
 } from "@luxydrive/ui";
 import { createFileRoute, createLink, Link, useRouter } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { type FormEvent, type ReactNode, useState } from "react";
 import { client } from "../api";
 
 const categories = ["jet", "yacht", "camper"] as const satisfies readonly ListingCategory[];
 
 type CatalogSearch = {
   category?: ListingCategory;
+  location?: string;
 };
 
 function isCategory(value: unknown): value is ListingCategory {
   return categories.some((category) => category === value);
+}
+
+// El router intenta leer cada parámetro como JSON: "?location=123" llega como número.
+function searchText(value: unknown) {
+  const text = typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
+  return text || undefined;
 }
 
 export const Route = createFileRoute("/experiencias/")({
@@ -41,12 +49,17 @@ export const Route = createFileRoute("/experiencias/")({
   // Una categoría desconocida se ignora y se ven todas.
   validateSearch: (search: Record<string, unknown>): CatalogSearch => ({
     category: isCategory(search.category) ? search.category : undefined,
+    location: searchText(search.location),
   }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
-    const res = await client.api.experiences.$get({ query: { category: deps.category } });
+    const res = await client.api.experiences.$get({
+      query: { category: deps.category, location: deps.location },
+    });
+    // Un 400 es un filtro que la API rechaza: se explica al usuario en vez de fallar.
+    if (res.status === 400) return { status: "invalid" as const, error: (await res.json()).error };
     if (!res.ok) throw new Error("experiences_unavailable");
-    return res.json();
+    return { status: "ok" as const, experiences: await res.json() };
   },
   pendingComponent: CatalogLoading,
   errorComponent: CatalogError,
@@ -68,6 +81,13 @@ const categoryTabs = [
   { id: "camper", label: "Autocaravanas", icon: <Caravan aria-hidden /> },
 ];
 
+const invalidFilterMessage = {
+  invalid_category: "La categoría elegida no existe.",
+  invalid_location: "La ciudad no es válida. Escribe un nombre de hasta 100 caracteres.",
+  invalid_date: "Alguna de las fechas no es válida.",
+  invalid_date_range: "La fecha de fin es anterior a la de inicio.",
+};
+
 const offerBadge = {
   standard: null,
   empty_leg: <OfferBadge icon={<Sparkles aria-hidden />}>Empty leg</OfferBadge>,
@@ -84,13 +104,46 @@ const serviceDate = new Intl.DateTimeFormat("es-ES", {
 });
 
 function Catalog() {
-  const experiences = Route.useLoaderData();
-  const { category } = Route.useSearch();
+  const result = Route.useLoaderData();
+  const { category, location } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const clearFilters = () => navigate({ search: {} });
+
+  if (result.status === "invalid") {
+    return (
+      <CatalogPage>
+        <Notice
+          tone="error"
+          title="No podemos aplicar estos filtros"
+          action={
+            <Button variant="tertiary" size="sm" className="h-auto" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
+          }
+        >
+          {invalidFilterMessage[result.error]}
+        </Notice>
+      </CatalogPage>
+    );
+  }
+
+  const { experiences } = result;
 
   if (experiences.length === 0) {
     return (
       <CatalogPage>
-        {category ? (
+        {location ? (
+          <EmptyState
+            icon={<Search aria-hidden />}
+            title="No hay experiencias con estos filtros"
+            description="Prueba con otra ciudad o quita algún filtro."
+            action={
+              <Button variant="secondary" onClick={clearFilters}>
+                Limpiar filtros
+              </Button>
+            }
+          />
+        ) : category ? (
           <EmptyState
             icon={<Search aria-hidden />}
             title="No hay experiencias en esta categoría"
@@ -197,6 +250,55 @@ function CategoryFilter() {
   );
 }
 
+function CatalogFilters() {
+  const { location } = Route.useSearch();
+  // La clave reinicia el formulario cuando la URL cambia desde fuera (limpiar, atrás).
+  return <FiltersForm key={location ?? ""} />;
+}
+
+function FiltersForm() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const [city, setCity] = useState(search.location ?? "");
+  const hasFilters = search.location !== undefined;
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    navigate({ search: (prev) => ({ ...prev, location: city.trim() || undefined }) });
+  }
+
+  return (
+    <search>
+      <form
+        aria-label="Filtrar experiencias"
+        onSubmit={submit}
+        className="flex flex-col gap-3 md:flex-row md:items-end"
+      >
+        <TextInput
+          label="Ciudad"
+          type="search"
+          name="location"
+          placeholder="Palma, Málaga, Ibiza…"
+          maxLength={100}
+          value={city}
+          onChange={(event) => setCity(event.target.value)}
+          className="md:flex-1"
+        />
+        <div className="flex items-center gap-4">
+          <Button type="submit" icon={<Search aria-hidden />} className="md:h-14">
+            Buscar
+          </Button>
+          {hasFilters && (
+            <Button type="button" variant="tertiary" onClick={() => navigate({ search: {} })}>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+      </form>
+    </search>
+  );
+}
+
 function CatalogPage({ subtitle, children }: { subtitle?: string; children: ReactNode }) {
   return (
     <>
@@ -217,6 +319,7 @@ function CatalogPage({ subtitle, children }: { subtitle?: string; children: Reac
               </Heading>
               {subtitle && <Text tone="muted">{subtitle}</Text>}
             </div>
+            <CatalogFilters />
             {children}
           </Section>
         </Container>
