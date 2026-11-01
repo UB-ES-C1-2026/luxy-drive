@@ -68,7 +68,10 @@ feature/*  ──PR──►  staging  ──PR──►  main  ──tag v*─�
                └──► dev = staging + todas las PRs abiertas contra staging
 ```
 
-1. **Crea tu rama desde `staging`**: `feature/US-001-browse`, `fix/...`, `chore/...`.
+1. **Una historia = una rama = una PR contra `staging`.** Crea la rama desde `staging`: `feature/US-006-registro-cliente` (también `feature/JS-001-ofertas`). No uses sufijos de tarea como `US-006.a` en la rama. Las tareas conservan sus issues: frontend, API y tests colaboran en la misma rama y PR, con commits separados y sin force-push sobre el trabajo de otros. Abre la PR como borrador mientras falten tareas; cuando estén verificadas, referencia cada issue con su propio `Closes #n`.
+   - Los elementos técnicos sin historia usan su propio código: `chore/SP-002-auth-decisions`, `chore/TR-003-story-branches`; un bug usa `fix/BUG-xxx-slug`.
+   - Transición: las PRs abiertas antes de adoptar esta norma continúan su revisión actual; no se renombran ni se agrupan retroactivamente. Para trabajo nuevo de una historia que ya tiene rama, coordina con su responsable y reutilízala.
+   - CI y Dev seleccionan PRs por destino (`staging`, y también `main` para CI), no por nombre de rama. El nuevo formato no necesita cambiar esos workflows.
 2. **Abre una PR contra `staging`** en cuanto tengas algo. Cada push a tu rama regenera `dev` (staging + todas las PRs abiertas) y la despliega en https://dev.luxydrive.workers.dev. Así pruebas tu cambio junto con el de los demás.
 3. Si tu PR choca con `staging` o con otra PR anterior, queda fuera de `dev` y recibe la etiqueta `dev-conflict`: actualiza tu rama con `staging` y resuelve el conflicto. La etiqueta `no-dev` excluye una PR a propósito.
 4. Cuando está probada en dev y revisada (1 aprobación + CI en verde), **squash merge a `staging`** → se despliega en staging (preproducción, la que prueba QA).
