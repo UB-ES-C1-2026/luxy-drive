@@ -58,6 +58,14 @@ export const requireUser: MiddlewareHandler<AuthEnv> = async (c, next) => {
   await next();
 };
 
+// Use after requireUser: the session exists but its role may not be allowed.
+export function requireRole(role: SessionUser["role"]): MiddlewareHandler<AuthEnv> {
+  return async (c, next) => {
+    if (c.get("user").role !== role) return c.json({ error: "forbidden" } as const, 403);
+    await next();
+  };
+}
+
 // Complements SameSite against CSRF on writes: front and API share one origin.
 export const sameOrigin: MiddlewareHandler<{ Bindings: Bindings }> = async (c, next) => {
   if (c.req.method === "GET" || c.req.method === "HEAD") return next();
