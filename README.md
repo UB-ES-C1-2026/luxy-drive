@@ -302,6 +302,16 @@ inicia la sesión (cookie `luxydrive_session`) y devuelve `201` con
 - Las rutas privadas usan el middleware `requireUser` (`apps/api/src/auth/session.ts`), que
   responde `401` sin sesión válida o con la sesión caducada.
 
+### API de registro de proveedor y rutas de proveedor (US-033.b)
+
+- `POST /api/auth/signup/provider`: igual que el registro de cliente (mismas validaciones,
+  `409 email_exists` si el email ya existe como cliente o proveedor), pero crea la cuenta con
+  rol `provider` e inicia su sesión. Desde el frontend:
+  `client.api.auth.signup.provider.$post({ json: { name, email, password } })`.
+- Las funciones de proveedor se montan en `apps/api/src/routes/provider.ts` y cuelgan de
+  `/api/provider/*`: sin sesión responden `401 unauthorized` y con una cuenta de cliente
+  `403 forbidden`. El rol sale siempre de la sesión en D1, nunca de la petición.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
