@@ -312,6 +312,24 @@ inicia la sesión (cookie `luxydrive_session`) y devuelve `201` con
   `/api/provider/*`: sin sesión responden `401 unauthorized` y con una cuenta de cliente
   `403 forbidden`. El rol sale siempre de la sesión en D1, nunca de la petición.
 
+### API de perfil de proveedor (US-008.b)
+
+Con sesión de proveedor (si no, `401` o `403` como el resto de `/api/provider/*`):
+
+- `POST /api/provider/profile` con `{ "tradeName", "description", "phone" }` crea el perfil de
+  empresa propio y devuelve `201` con `{ "id", "tradeName", "description", "phone" }`. Un
+  segundo perfil para la misma cuenta responde `409 profile_exists`.
+- `GET /api/provider/profile`: el perfil propio (`200`) o `404 not_found` si aún no existe.
+- `PATCH /api/provider/profile/:id` con uno o varios campos los cambia y devuelve el perfil.
+  El perfil de otro proveedor responde `403 forbidden` y no cambia; uno inexistente, `404`.
+- Un campo vacío responde `400` con `invalid_trade_name`, `invalid_description` o
+  `invalid_phone`, y no se guarda nada. El contacto es un teléfono: `+` opcional y de 9 a 15
+  dígitos, con espacios o guiones sueltos entre ellos.
+- Desde el frontend: `client.api.provider.profile.$post({ json })`,
+  `client.api.provider.profile.$get()` y
+  `client.api.provider.profile[":id"].$patch({ param: { id }, json })`.
+- Tabla `provider_profiles` (migración `create_provider_profiles`), una fila por cuenta.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
