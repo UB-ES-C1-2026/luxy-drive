@@ -1,8 +1,12 @@
 import {
   Button,
+  ButtonLink,
+  Caravan,
+  CategoryTabs,
   Container,
   EmptyState,
   Heading,
+  LayoutGrid,
   ListingCard,
   ListingCardSkeleton,
   type ListingCategory,
@@ -10,19 +14,37 @@ import {
   Logo,
   Notice,
   OfferBadge,
+  Plane,
+  Sailboat,
   Search,
   Section,
   Sparkles,
   Text,
   TopNav,
 } from "@luxydrive/ui";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, createLink, Link, useRouter } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { client } from "../api";
 
+const categories = ["jet", "yacht", "camper"] as const satisfies readonly ListingCategory[];
+
+type CatalogSearch = {
+  category?: ListingCategory;
+};
+
+function isCategory(value: unknown): value is ListingCategory {
+  return categories.some((category) => category === value);
+}
+
 export const Route = createFileRoute("/experiencias/")({
-  loader: async () => {
-    const res = await client.api.experiences.$get({ query: {} });
+  // Los filtros viven en la URL para que un enlace compartido los conserve.
+  // Una categoría desconocida se ignora y se ven todas.
+  validateSearch: (search: Record<string, unknown>): CatalogSearch => ({
+    category: isCategory(search.category) ? search.category : undefined,
+  }),
+  loaderDeps: ({ search }) => search,
+  loader: async ({ deps }) => {
+    const res = await client.api.experiences.$get({ query: { category: deps.category } });
     if (!res.ok) throw new Error("experiences_unavailable");
     return res.json();
   },
@@ -31,11 +53,20 @@ export const Route = createFileRoute("/experiencias/")({
   component: Catalog,
 });
 
+const CatalogButton = createLink(ButtonLink);
+
 const categoryLabel: Record<ListingCategory, string> = {
   jet: "Jet privado",
   yacht: "Yate",
   camper: "Autocaravana",
 };
+
+const categoryTabs = [
+  { id: "all", label: "Todas", icon: <LayoutGrid aria-hidden /> },
+  { id: "jet", label: "Jets privados", icon: <Plane aria-hidden /> },
+  { id: "yacht", label: "Yates", icon: <Sailboat aria-hidden /> },
+  { id: "camper", label: "Autocaravanas", icon: <Caravan aria-hidden /> },
+];
 
 const offerBadge = {
   standard: null,
@@ -54,15 +85,29 @@ const serviceDate = new Intl.DateTimeFormat("es-ES", {
 
 function Catalog() {
   const experiences = Route.useLoaderData();
+  const { category } = Route.useSearch();
 
   if (experiences.length === 0) {
     return (
       <CatalogPage>
-        <EmptyState
-          icon={<Search aria-hidden />}
-          title="No hay experiencias disponibles"
-          description="Vuelve a mirar en unos días."
-        />
+        {category ? (
+          <EmptyState
+            icon={<Search aria-hidden />}
+            title="No hay experiencias en esta categoría"
+            description="Prueba con otra categoría o vuelve a mirar en unos días."
+            action={
+              <CatalogButton to="/experiencias" search={{}} variant="secondary">
+                Ver todas las experiencias
+              </CatalogButton>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={<Search aria-hidden />}
+            title="No hay experiencias disponibles"
+            description="Vuelve a mirar en unos días."
+          />
+        )}
       </CatalogPage>
     );
   }
@@ -134,6 +179,24 @@ function CatalogError() {
   );
 }
 
+function CategoryFilter() {
+  const { category } = Route.useSearch();
+  const navigate = Route.useNavigate();
+
+  return (
+    <CategoryTabs
+      aria-label="Filtrar por categoría"
+      items={categoryTabs}
+      value={category ?? "all"}
+      onChange={(id) =>
+        navigate({
+          search: (prev) => ({ ...prev, category: isCategory(id) ? id : undefined }),
+        })
+      }
+    />
+  );
+}
+
 function CatalogPage({ subtitle, children }: { subtitle?: string; children: ReactNode }) {
   return (
     <>
@@ -143,6 +206,7 @@ function CatalogPage({ subtitle, children }: { subtitle?: string; children: Reac
             <Logo />
           </Link>
         }
+        center={<CategoryFilter />}
       />
       <main>
         <Container size="wide">
