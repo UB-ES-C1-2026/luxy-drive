@@ -289,3 +289,77 @@ Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudfl
 | `main-guard.yml` | PR contra `main` |
 | `back-merge.yml` | push a `main` |
 | `reset-dev-db.yml` | manual |
+
+## SP-002: autenticación y roles (Sprint 1)
+
+Decisión de diseño para #29. La implementación corresponde a #45 (registro de
+cliente y BD), #48 (login/logout) y #51 (registro y autorización de proveedor).
+No añade endpoints ni migraciones por sí sola.
+
+### Contraseñas
+
+- Usar Web Crypto nativo de Workers: PBKDF2-HMAC-SHA-256, 100 000 iteraciones,
+  salt aleatorio de 16 bytes por contraseña y resultado de 32 bytes. Guardar
+  versión, algoritmo, iteraciones, salt y hash; nunca la contraseña ni sus logs.
+- Antes de PBKDF2, aplicar HMAC-SHA-256 a la contraseña UTF-8 con un secreto
+  `AUTH_PEPPER` aleatorio de al menos 32 bytes, distinto por entorno. El resultado
+  binario es la entrada de PBKDF2. El pepper va en Workers Secrets y en
+  `.dev.vars` en local, nunca en D1 ni en Git. Si falta, fallar de forma cerrada.
+  Los tests usarán un secreto ficticio. No cambiar el pepper sin planificar el
+  restablecimiento de contraseñas: cambiarlo invalida las verificaciones existentes.
+- Comparar hashes con una función de tiempo constante disponible en Workers.
+  Para email inexistente, ejecutar también la derivación con un registro ficticio
+  y responder igual que para contraseña incorrecta: `401 invalid_credentials`.
+- Motivo: funciona sin librerías nativas ni servicios externos. **Compromiso del
+  sprint:** el límite de Workers es 100 000 iteraciones; no equivale a la
+  recomendación de OWASP de 600 000 para PBKDF2-SHA-256. El pepper separado de D1
+  reduce el riesgo de una filtración solo de la BD, pero no sustituye ese coste.
+  Antes de abrir registro público real, revisar el hash y limitar intentos de
+  registro/login; no presentar esta decisión como un endurecimiento de producción.
+- Referencias: [Web Crypto de Workers](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/),
+  [límite de PBKDF2 en workerd](https://github.com/cloudflare/workerd/issues/1346),
+  [OWASP Password Storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
+
+### Usuarios y sesiones en D1
+
+- `users`: id, nombre, email normalizado (trim + minúsculas, `UNIQUE`), datos del
+  hash y rol restringido a `client` o `provider`. Un email identifica una sola
+  cuenta entre ambos roles. La restricción SQL resuelve también registros simultáneos.
+- El endpoint de registro de cliente fija `client`; el de proveedor fija
+  `provider`. No aceptar un rol arbitrario enviado por el navegador. El registro
+  de proveedor es público según US-033; no implica aprobación de una empresa.
+- `sessions`: hash SHA-256 del token como clave, `user_id` como clave foránea y
+  `expires_at` como timestamp Unix UTC en segundos. El token se genera con
+  `crypto.getRandomValues` (32 bytes), se codifica en base64url y solo se entrega
+  al navegador. SHA-256 es adecuado aquí porque el token es aleatorio de alta
+  entropía; no lo es para guardar contraseñas.
+- Cookie `luxydrive_session`: `HttpOnly; Secure; SameSite=Lax; Path=/`, sin
+  `Domain` (aislada por host), `Max-Age=604800`. En desarrollo local HTTP se omite
+  únicamente `Secure`. Duración fija de 7 días, sin renovación automática.
+- Registro y login crean un token nuevo y devuelven solo id, nombre y rol.
+  Cada petición privada consulta sesión y usuario en D1; una sesión vencida
+  (`expires_at <= ahora`) se rechaza aunque siga existiendo su fila.
+- Logout mediante POST: borrar la sesión de D1 y expirar la cookie con el mismo
+  nombre y Path. Es idempotente (204 incluso sin sesión). No basta con borrar
+  la cookie: un token copiado también debe quedar invalidado. Las sesiones de
+  otros dispositivos siguen activas. La limpieza de filas vencidas no condiciona
+  la autorización.
+
+### Autorización y contrato compartido
+
+- Sin sesión válida: `401 unauthorized`. Con sesión de cliente en una ruta de
+  proveedor: `403 forbidden`. Resolver el rol en servidor, nunca desde un campo
+  de la petición o del almacenamiento del navegador.
+- Un proveedor solo puede consultar o modificar sus propios recursos: comprobar
+  también la relación de propiedad en SQL. El rol por sí solo no basta (#54, #57).
+- Registro: nombre no vacío, email válido y contraseña de al menos 8 caracteres;
+  `400` con campo inválido, `409 email_exists` si ya existe el email, y sesión
+  iniciada tras éxito. No devolver hashes, salts, pepper ni tokens en JSON.
+- Operaciones con efectos usan POST/PATCH/DELETE, nunca GET. Rechazar escrituras
+  de autenticación o autenticadas cuyo `Origin` no coincida con el origen de la
+  petición (también si falta); frontend y API comparten origen. Esto complementa
+  SameSite frente a CSRF, incluido login/logout. No habilitar CORS con credenciales
+  para orígenes arbitrarios.
+- Tests de implementación: registro válido/duplicado/campos, credenciales erróneas,
+  sesión ausente/vencida/revocada, separación client/provider, propiedad de recursos
+  y Origin incorrecto. Las migraciones serán nuevas y compatibles con el despliegue.
