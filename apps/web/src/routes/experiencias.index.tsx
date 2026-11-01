@@ -32,6 +32,9 @@ const categories = ["jet", "yacht", "camper"] as const satisfies readonly Listin
 type CatalogSearch = {
   category?: ListingCategory;
   location?: string;
+  /** Días YYYY-MM-DD en hora de Madrid, ambos incluidos. */
+  from?: string;
+  to?: string;
 };
 
 function isCategory(value: unknown): value is ListingCategory {
@@ -50,11 +53,13 @@ export const Route = createFileRoute("/experiencias/")({
   validateSearch: (search: Record<string, unknown>): CatalogSearch => ({
     category: isCategory(search.category) ? search.category : undefined,
     location: searchText(search.location),
+    from: searchText(search.from),
+    to: searchText(search.to),
   }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
     const res = await client.api.experiences.$get({
-      query: { category: deps.category, location: deps.location },
+      query: { category: deps.category, location: deps.location, from: deps.from, to: deps.to },
     });
     // Un 400 es un filtro que la API rechaza: se explica al usuario en vez de fallar.
     if (res.status === 400) return { status: "invalid" as const, error: (await res.json()).error };
@@ -88,6 +93,9 @@ const invalidFilterMessage = {
   invalid_date_range: "La fecha de fin es anterior a la de inicio.",
 };
 
+// Hoy en Madrid como YYYY-MM-DD (en-CA ya formatea así), para no ofrecer días pasados.
+const madridDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" });
+
 const offerBadge = {
   standard: null,
   empty_leg: <OfferBadge icon={<Sparkles aria-hidden />}>Empty leg</OfferBadge>,
@@ -105,7 +113,7 @@ const serviceDate = new Intl.DateTimeFormat("es-ES", {
 
 function Catalog() {
   const result = Route.useLoaderData();
-  const { category, location } = Route.useSearch();
+  const { category, location, from, to } = Route.useSearch();
   const navigate = Route.useNavigate();
   const clearFilters = () => navigate({ search: {} });
 
@@ -132,11 +140,11 @@ function Catalog() {
   if (experiences.length === 0) {
     return (
       <CatalogPage>
-        {location ? (
+        {location || from || to ? (
           <EmptyState
             icon={<Search aria-hidden />}
             title="No hay experiencias con estos filtros"
-            description="Prueba con otra ciudad o quita algún filtro."
+            description="Prueba con otra ciudad u otras fechas, o quita algún filtro."
             action={
               <Button variant="secondary" onClick={clearFilters}>
                 Limpiar filtros
@@ -251,28 +259,51 @@ function CategoryFilter() {
 }
 
 function CatalogFilters() {
-  const { location } = Route.useSearch();
+  const { location, from, to } = Route.useSearch();
   // La clave reinicia el formulario cuando la URL cambia desde fuera (limpiar, atrás).
-  return <FiltersForm key={location ?? ""} />;
+  return <FiltersForm key={[location, from, to].join("|")} />;
 }
 
 function FiltersForm() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const [city, setCity] = useState(search.location ?? "");
-  const hasFilters = search.location !== undefined;
+  const [from, setFrom] = useState(search.from ?? "");
+  const [to, setTo] = useState(search.to ?? "");
+  const [dateError, setDateError] = useState<string>();
+  const hasFilters = [search.location, search.from, search.to].some(Boolean);
+  const today = madridDay.format(new Date());
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    navigate({ search: (prev) => ({ ...prev, location: city.trim() || undefined }) });
+    // Un rango no válido no se aplica: se avisa y se mantienen los filtros anteriores.
+    if ((from && from < today) || (to && to < today)) {
+      setDateError("No se puede elegir un día pasado.");
+      return;
+    }
+    if (from && to && to < from) {
+      setDateError("La fecha de fin es anterior a la de inicio. Corrige el rango para aplicarlo.");
+      return;
+    }
+    setDateError(undefined);
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        location: city.trim() || undefined,
+        from: from || undefined,
+        to: to || undefined,
+      }),
+    });
   }
 
   return (
     <search>
       <form
         aria-label="Filtrar experiencias"
+        // Validamos nosotros para mostrar el aviso propio en vez del globo del navegador.
+        noValidate
         onSubmit={submit}
-        className="flex flex-col gap-3 md:flex-row md:items-end"
+        className="grid grid-cols-2 gap-3 md:grid-cols-[minmax(0,1fr)_11rem_11rem_auto] md:items-end"
       >
         <TextInput
           label="Ciudad"
@@ -282,9 +313,25 @@ function FiltersForm() {
           maxLength={100}
           value={city}
           onChange={(event) => setCity(event.target.value)}
-          className="md:flex-1"
+          className="col-span-2 md:col-span-1"
         />
-        <div className="flex items-center gap-4">
+        <TextInput
+          label="Desde"
+          type="date"
+          name="from"
+          min={today}
+          value={from}
+          onChange={(event) => setFrom(event.target.value)}
+        />
+        <TextInput
+          label="Hasta"
+          type="date"
+          name="to"
+          min={today}
+          value={to}
+          onChange={(event) => setTo(event.target.value)}
+        />
+        <div className="col-span-2 flex items-center gap-4 md:col-span-1">
           <Button type="submit" icon={<Search aria-hidden />} className="md:h-14">
             Buscar
           </Button>
@@ -294,6 +341,11 @@ function FiltersForm() {
             </Button>
           )}
         </div>
+        {dateError && (
+          <Notice tone="error" title="Revisa las fechas" className="col-span-2 md:col-span-4">
+            {dateError}
+          </Notice>
+        )}
       </form>
     </search>
   );
