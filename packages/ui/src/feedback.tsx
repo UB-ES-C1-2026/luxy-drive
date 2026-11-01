@@ -33,11 +33,13 @@ export type NoticeProps = {
   title: string;
   children?: ReactNode;
   action?: ReactNode;
+  /** Sustituye al icono de alerta, p. ej. una marca de "guardado". */
+  icon?: ReactNode;
   className?: string;
 };
 
 /** Aviso en línea (error al cargar, información). */
-export function Notice({ tone = "info", title, children, action, className }: NoticeProps) {
+export function Notice({ tone = "info", title, children, action, icon, className }: NoticeProps) {
   return (
     <div
       role={tone === "error" ? "alert" : "status"}
@@ -47,10 +49,15 @@ export function Notice({ tone = "info", title, children, action, className }: No
         className,
       )}
     >
-      <CircleAlert
+      <span
         aria-hidden
-        className={cx("mt-0.5 size-5 shrink-0", tone === "error" ? "text-error" : "text-ink")}
-      />
+        className={cx(
+          "mt-0.5 flex shrink-0 [&>svg]:size-5",
+          tone === "error" ? "text-error" : "text-ink",
+        )}
+      >
+        {icon ?? <CircleAlert />}
+      </span>
       <div className="flex flex-1 flex-col gap-1">
         <p className={cx("text-title-md", tone === "error" ? "text-error" : "text-ink")}>{title}</p>
         {children && <div className="text-body-sm text-body">{children}</div>}
