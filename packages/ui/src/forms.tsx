@@ -1,4 +1,10 @@
-import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, useId } from "react";
+import {
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type TextareaHTMLAttributes,
+  useId,
+} from "react";
 import { IconButton } from "./button";
 import { Minus, Plus } from "./icons";
 import { cx, focusRing } from "./utils";
@@ -29,6 +35,50 @@ export function TextInput({ label, hint, error, id, className, ...props }: TextI
         aria-describedby={message ? messageId : undefined}
         className={cx(
           "h-14 rounded-sm border bg-canvas px-3 text-body-md text-ink outline-none transition-shadow placeholder:text-muted",
+          "focus:border-ink focus:shadow-[inset_0_0_0_1px_var(--color-ink)]",
+          "disabled:cursor-not-allowed disabled:bg-surface-soft disabled:text-muted-soft",
+          error
+            ? "border-error shadow-[inset_0_0_0_1px_var(--color-error)] focus:border-error focus:shadow-[inset_0_0_0_1px_var(--color-error)]"
+            : "border-hairline",
+        )}
+        {...props}
+      />
+      {message && (
+        <p id={messageId} className={cx("text-body-sm", error ? "text-error" : "text-muted")}>
+          {message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  label: string;
+  /** Texto de ayuda bajo el campo. */
+  hint?: ReactNode;
+  /** Mensaje de error; marca el campo como inválido. */
+  error?: ReactNode;
+};
+
+/** Texto largo (descripciones): mismo borde, foco y error que TextInput. */
+export function TextArea({ label, hint, error, id, className, rows = 4, ...props }: TextAreaProps) {
+  const autoId = useId();
+  const inputId = id ?? autoId;
+  const messageId = `${inputId}-message`;
+  const message = error ?? hint;
+
+  return (
+    <div className={cx("flex flex-col gap-1.5", className)}>
+      <label htmlFor={inputId} className="text-caption text-muted">
+        {label}
+      </label>
+      <textarea
+        id={inputId}
+        rows={rows}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={message ? messageId : undefined}
+        className={cx(
+          "min-h-28 resize-y rounded-sm border bg-canvas px-3 py-3.5 text-body-md text-ink outline-none transition-shadow placeholder:text-muted",
           "focus:border-ink focus:shadow-[inset_0_0_0_1px_var(--color-ink)]",
           "disabled:cursor-not-allowed disabled:bg-surface-soft disabled:text-muted-soft",
           error
