@@ -327,7 +327,7 @@ Con sesión de proveedor (si no, `401` o `403` como el resto de `/api/provider/*
   dígitos, con espacios o guiones sueltos entre ellos.
 - Desde el frontend: `client.api.provider.profile.$post({ json })`,
   `client.api.provider.profile.$get()` y
-  `client.api.provider.profile[":id"].$patch({ param: { id }, json })`.
+  `client.api.provider.profile[":id{[0-9]+}"].$patch({ param: { id }, json })`.
 - Tabla `provider_profiles` (migración `create_provider_profiles`), una fila por cuenta.
 
 ## Despliegue y credenciales
