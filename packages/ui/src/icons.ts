@@ -13,6 +13,7 @@ export {
   CircleCheck,
   Globe,
   Heart,
+  LayoutGrid,
   LogIn,
   type LucideIcon,
   type LucideProps,
