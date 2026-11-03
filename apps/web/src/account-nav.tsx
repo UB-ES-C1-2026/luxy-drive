@@ -17,9 +17,10 @@ export function AccountNav() {
   const user = useSessionUser();
   const navigate = useNavigate();
 
-  // Proveedores, a su zona; visitantes y clientes, a darse de alta como proveedor.
+  // Proveedores, a su zona; visitantes, a darse de alta como proveedor. Una cuenta de
+  // cliente es para reservar, así que no se le ofrece.
   const providerArea = user?.role === "provider" ? "/proveedor" : "/proveedor/registro";
-  const publish = (
+  const publish = user?.role !== "client" && (
     // En móvil no cabe en la barra: está dentro del menú.
     <span className="hidden md:block">
       <NavLink to={providerArea}>Publica tu vehículo</NavLink>
@@ -59,9 +60,7 @@ export function AccountNav() {
         <MenuLink to="/cuenta" strong>
           Mi cuenta
         </MenuLink>
-        <MenuLink to={providerArea}>
-          {user.role === "provider" ? "Zona de proveedor" : "Publica tu vehículo"}
-        </MenuLink>
+        {user.role === "provider" && <MenuLink to={providerArea}>Zona de proveedor</MenuLink>}
         <AccountMenuDivider />
         <AccountMenuButton onClick={signOut}>Cerrar sesión</AccountMenuButton>
       </AccountMenu>
