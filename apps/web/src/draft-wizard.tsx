@@ -2,6 +2,7 @@ import {
   Button,
   Caravan,
   ChoiceCards,
+  formatPrice,
   Heading,
   type ListingCategory,
   Notice,
@@ -15,6 +16,8 @@ import {
 import type { InferResponseType } from "hono/client";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { client } from "./api";
+import { nowInMadrid, toMadridLocal } from "./madrid-time";
+import { parsePrice } from "./price";
 
 export type Draft = InferResponseType<(typeof client.api.provider.experiences)[":id"]["$get"], 200>;
 
@@ -31,8 +34,16 @@ const categoryIcon: Record<ListingCategory, ReactNode> = {
 };
 
 type Step = {
-  field: "title" | "category" | "vehicle" | "location" | "capacity" | "description";
-  kind: "text" | "choice" | "number" | "long";
+  field:
+    | "title"
+    | "category"
+    | "vehicle"
+    | "location"
+    | "capacity"
+    | "price"
+    | "serviceAt"
+    | "description";
+  kind: "text" | "choice" | "number" | "price" | "datetime" | "long";
   /** Etiqueta corta, para el resumen. */
   label: string;
   question: string;
@@ -49,6 +60,16 @@ type Step = {
 };
 
 const upTo = (max: number) => (value: string) => value.trim().length <= max;
+
+const serviceDate = new Intl.DateTimeFormat("es-ES", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "Europe/Madrid",
+});
 const wholeNumber = /^\d+$/;
 
 /** Una pregunta por pantalla, en este orden. Solo el título es obligatorio. */
@@ -109,6 +130,32 @@ export const steps: Step[] = [
     show: (draft) => (draft.capacity === null ? "" : `Hasta ${draft.capacity} personas`),
   },
   {
+    field: "price",
+    kind: "price",
+    label: "Precio",
+    question: "¿Cuánto cuesta la experiencia completa?",
+    help: "En euros y por la experiencia completa, no por persona. El detalle calculará cuánto sale por persona.",
+    placeholder: "Por ejemplo, 1.200",
+    invalid:
+      "Escribe un precio en euros de 0 o más, con dos decimales como máximo (por ejemplo, 1200 o 1200,50).",
+    valid: (value) => !value.trim() || parsePrice(value) !== null,
+    read: (draft) => (draft.price === null ? "" : String(draft.price).replace(".", ",")),
+    show: (draft) =>
+      draft.price === null ? "" : `${formatPrice(draft.price)} experiencia completa`,
+  },
+  {
+    field: "serviceAt",
+    kind: "datetime",
+    label: "Fecha y hora de servicio",
+    question: "¿Qué día y a qué hora es?",
+    help: "En hora de Madrid. Tiene que ser una fecha futura.",
+    invalid: "Esa fecha y hora ya han pasado: elige una fecha de servicio futura.",
+    // Mismo formato y zona horaria en los dos lados: se pueden comparar como texto.
+    valid: (value) => !value || value > nowInMadrid(),
+    read: (draft) => (draft.serviceAt ? toMadridLocal(new Date(draft.serviceAt)) : ""),
+    show: (draft) => (draft.serviceAt ? serviceDate.format(new Date(draft.serviceAt)) : ""),
+  },
+  {
     field: "description",
     kind: "long",
     label: "Descripción",
@@ -126,6 +173,9 @@ const errorField: Record<string, Step["field"]> = {
   invalid_vehicle: "vehicle",
   invalid_location: "location",
   invalid_capacity: "capacity",
+  invalid_price: "price",
+  invalid_service_at: "serviceAt",
+  service_at_in_past: "serviceAt",
   invalid_description: "description",
 };
 
@@ -133,7 +183,9 @@ const errorField: Record<string, Step["field"]> = {
 function payload(step: Step, value: string) {
   const text = value.trim();
   if (!text) return {};
-  return { [step.field]: step.kind === "number" ? Number(text) : text };
+  if (step.kind === "number") return { [step.field]: Number(text) };
+  if (step.kind === "price") return { price: parsePrice(text) ?? undefined };
+  return { [step.field]: text };
 }
 
 type Problem = { title: string; body: string };
@@ -266,12 +318,26 @@ export function DraftStep({
           error={error}
           autoFocus
         />
+      ) : step.kind === "datetime" ? (
+        <TextInput
+          id={inputId}
+          label={step.question}
+          className="[&>label]:sr-only"
+          type="datetime-local"
+          min={nowInMadrid()}
+          value={value}
+          onChange={change}
+          error={error}
+          autoFocus
+        />
       ) : (
         <TextInput
           id={inputId}
           label={step.question}
           className="[&>label]:sr-only"
-          inputMode={step.kind === "number" ? "numeric" : undefined}
+          inputMode={
+            step.kind === "number" ? "numeric" : step.kind === "price" ? "decimal" : undefined
+          }
           placeholder={step.placeholder}
           value={value}
           onChange={change}
