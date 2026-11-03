@@ -2,11 +2,12 @@ import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
+  type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
   useId,
 } from "react";
 import { IconButton } from "./button";
-import { Minus, Plus } from "./icons";
+import { ChevronDown, Minus, Plus } from "./icons";
 import { cx, focusRing } from "./utils";
 
 export type TextInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "size"> & {
@@ -87,6 +88,74 @@ export function TextArea({ label, hint, error, id, className, rows = 4, ...props
         )}
         {...props}
       />
+      {message && (
+        <p id={messageId} className={cx("text-body-sm", error ? "text-error" : "text-muted")}>
+          {message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export type SelectOption = { value: string; label: string };
+
+export type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "size" | "children"> & {
+  label: string;
+  options: SelectOption[];
+  /** Primera opción vacía ("Elige una categoría"). */
+  placeholder?: string;
+  hint?: ReactNode;
+  error?: ReactNode;
+};
+
+/** Desplegable nativo con el mismo aspecto que TextInput. */
+export function Select({
+  label,
+  options,
+  placeholder,
+  hint,
+  error,
+  id,
+  className,
+  ...props
+}: SelectProps) {
+  const autoId = useId();
+  const inputId = id ?? autoId;
+  const messageId = `${inputId}-message`;
+  const message = error ?? hint;
+
+  return (
+    <div className={cx("flex flex-col gap-1.5", className)}>
+      <label htmlFor={inputId} className="text-caption text-muted">
+        {label}
+      </label>
+      <div className="relative">
+        <select
+          id={inputId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={message ? messageId : undefined}
+          className={cx(
+            "h-14 w-full appearance-none rounded-sm border bg-canvas pr-10 pl-3 text-body-md text-ink outline-none transition-shadow",
+            "focus:border-ink focus:shadow-[inset_0_0_0_1px_var(--color-ink)]",
+            "disabled:cursor-not-allowed disabled:bg-surface-soft disabled:text-muted-soft",
+            error
+              ? "border-error shadow-[inset_0_0_0_1px_var(--color-error)] focus:border-error focus:shadow-[inset_0_0_0_1px_var(--color-error)]"
+              : "border-hairline",
+          )}
+          {...props}
+        >
+          {placeholder !== undefined && <option value="">{placeholder}</option>}
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-ink"
+        />
+      </div>
       {message && (
         <p id={messageId} className={cx("text-body-sm", error ? "text-error" : "text-muted")}>
           {message}
