@@ -80,4 +80,4 @@ export { SearchBar, type SearchBarProps, SearchOrb, type SearchSegment } from ".
 export { ColorSwatch, type ColorSwatchProps } from "./swatch";
 export { TextLink, type TextLinkProps } from "./text-link";
 export { Heading, type HeadingProps, Text, type TextProps } from "./typography";
-export { cx, formatPrice } from "./utils";
+export { cx, formatPrice, formatPriceCents } from "./utils";

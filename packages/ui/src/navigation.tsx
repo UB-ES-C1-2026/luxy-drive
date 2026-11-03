@@ -36,7 +36,8 @@ export function TopNav({ brand, center, actions, className }: TopNavProps) {
             {center}
           </div>
         )}
-        <div className="flex items-center justify-end gap-2">{actions}</div>
+        {/* Columna 3 aunque no haya centro: si no, las acciones quedarían centradas. */}
+        <div className="flex items-center justify-end gap-2 md:col-start-3">{actions}</div>
       </div>
     </header>
   );
