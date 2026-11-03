@@ -8,7 +8,12 @@ export default defineConfig(async () => {
     plugins: [
       cloudflareTest({
         wrangler: { configPath: "./wrangler.jsonc" },
-        miniflare: { bindings: { TEST_MIGRATIONS: migrations } },
+        miniflare: {
+          bindings: {
+            TEST_MIGRATIONS: migrations,
+            AUTH_PEPPER: "test-pepper-not-a-real-secret-000000",
+          },
+        },
       }),
     ],
     test: {
