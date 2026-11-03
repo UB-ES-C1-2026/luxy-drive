@@ -11,7 +11,7 @@ import {
 } from "@luxydrive/ui";
 import { createFileRoute, createLink, useRouter } from "@tanstack/react-router";
 import { client } from "../api";
-import { categoryOptions } from "../draft-form";
+import { categoryLabel } from "../draft-wizard";
 import { ProviderOnly, ProviderPage, requireSession } from "../provider-page";
 import { loadSession, useSessionUser } from "../session";
 
@@ -30,10 +30,6 @@ export const Route = createFileRoute("/proveedor/")({
 
 const PageButton = createLink(ButtonLink);
 const ListingLink = createLink(TextLink);
-
-const categoryLabel = Object.fromEntries(
-  categoryOptions.map((option) => [option.value, option.label]),
-);
 
 function ProviderHome() {
   const user = useSessionUser();

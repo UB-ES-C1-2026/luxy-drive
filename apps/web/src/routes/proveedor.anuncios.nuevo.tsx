@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { DraftForm } from "../draft-form";
+import { DraftStep } from "../draft-wizard";
 import { ProviderOnly, ProviderPage, requireSession } from "../provider-page";
 import { useSessionUser } from "../session";
 
@@ -14,17 +14,16 @@ function NewDraft() {
 
   if (user?.role !== "provider") return <ProviderOnly />;
 
+  // La primera pregunta crea el borrador; las demás ya van sobre su página.
   return (
-    <ProviderPage
-      title="Nuevo anuncio"
-      subtitle="Se guarda como borrador: nadie lo verá en el catálogo hasta que lo publiques."
-    >
-      <DraftForm
+    <ProviderPage>
+      <DraftStep
+        index={0}
         onSaved={async (draft) => {
           await navigate({
             to: "/proveedor/anuncios/$id",
             params: { id: String(draft.id) },
-            search: { guardado: true },
+            search: { paso: 2 },
           });
         }}
       />

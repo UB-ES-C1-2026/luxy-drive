@@ -19,10 +19,11 @@ export function AccountNav() {
 
   // Proveedores, a su zona; visitantes y clientes, a darse de alta como proveedor.
   const providerArea = user?.role === "provider" ? "/proveedor" : "/proveedor/registro";
+  const publishTo = user?.role === "provider" ? "/proveedor/anuncios/nuevo" : "/proveedor/registro";
   const publish = (
     // En móvil no cabe en la barra: está dentro del menú.
     <span className="hidden md:block">
-      <NavLink to={providerArea}>Publica tu vehículo</NavLink>
+      <NavLink to={publishTo}>Publica tu vehículo</NavLink>
     </span>
   );
 
