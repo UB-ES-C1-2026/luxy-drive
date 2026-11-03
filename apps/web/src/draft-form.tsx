@@ -110,19 +110,37 @@ function toJson(values: Fields) {
   };
 }
 
+const fieldLabel: Record<Field, string> = {
+  title: "Título",
+  category: "Categoría",
+  vehicle: "Vehículo",
+  location: "Ubicación o ruta",
+  capacity: "Plazas",
+  price: "Precio",
+  serviceAt: "Fecha y hora de servicio",
+  description: "Descripción",
+};
+
+const isField = (value: string): value is Field => value in fieldLabel;
+
 type Problem = { title: string; body: string };
 const networkProblem: Problem = {
   title: "No se ha podido guardar el borrador",
   body: "Comprueba tu conexión e inténtalo de nuevo. No hemos borrado lo que has escrito.",
 };
 
-/** Formulario del anuncio en borrador. Sin `draft` lo crea; con `draft` guarda los cambios. */
+/**
+ * Formulario del anuncio en borrador. Sin `draft` lo crea; con `draft` guarda los cambios.
+ * Con `onPublished`, "Publicar anuncio" guarda lo escrito y después lo publica.
+ */
 export function DraftForm({
   draft,
   onSaved,
+  onPublished,
 }: {
   draft?: Draft;
   onSaved: (saved: Draft) => Promise<void>;
+  onPublished?: (published: Draft) => Promise<void>;
 }) {
   const [values, setValues] = useState<Fields>(() => initialValues(draft));
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
@@ -140,8 +158,47 @@ export function DraftForm({
     if (first) document.getElementById(`draft-${first}`)?.focus();
   };
 
+  const publish = async (saved: Draft) => {
+    const res = await client.api.provider.experiences[":id"].publish.$post({
+      param: { id: String(saved.id) },
+    });
+    if (res.ok) return await onPublished?.(await res.json());
+    const status: number = res.status;
+    if (status === 400) {
+      const body = await res.json();
+      if ("fields" in body) {
+        // La API dice exactamente qué falta; se marca en cada campo y se resume arriba.
+        const missing = body.fields.filter(isField);
+        showErrors(Object.fromEntries(missing.map((field) => [field, "Falta para publicar."])));
+        return setProblem({
+          title: `Para publicar falta: ${missing.map((field) => fieldLabel[field]).join(", ")}`,
+          body: "Hemos guardado el borrador. Sigue oculto en el catálogo hasta que lo completes.",
+        });
+      }
+      if (body.error === "service_at_in_past") {
+        showErrors({ serviceAt: pastServiceAt });
+        return setProblem({
+          title: "La fecha de servicio ya ha pasado",
+          body: "Cambia la fecha y hora por una futura y vuelve a publicar. El anuncio sigue oculto.",
+        });
+      }
+    }
+    if (status === 409) {
+      return setProblem({
+        title: "Este anuncio ya está publicado",
+        body: "Recarga la página para ver su estado actual.",
+      });
+    }
+    setProblem({
+      title: "No se ha podido publicar",
+      body: "Hemos guardado el borrador. Comprueba tu conexión e inténtalo de nuevo.",
+    });
+  };
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const publishing = submitter?.getAttribute("value") === "publish";
     setProblem(null);
     const invalid = validate(values);
     if (Object.keys(invalid).length > 0) return showErrors(invalid);
@@ -158,7 +215,7 @@ export function DraftForm({
       if (res.ok) {
         const saved = await res.json();
         setValues(initialValues(saved));
-        return await onSaved(saved);
+        return publishing ? await publish(saved) : await onSaved(saved);
       }
       const status: number = res.status;
       if (status === 400) {
@@ -264,10 +321,20 @@ export function DraftForm({
         onChange={change("description")}
         error={errors.description}
       />
-      <div>
-        <Button type="submit" disabled={saving}>
+      <div className="flex flex-wrap gap-3">
+        <Button
+          type="submit"
+          value="save"
+          variant={onPublished ? "secondary" : "primary"}
+          disabled={saving}
+        >
           {saving ? "Guardando…" : "Guardar borrador"}
         </Button>
+        {onPublished && (
+          <Button type="submit" value="publish" disabled={saving}>
+            Publicar anuncio
+          </Button>
+        )}
       </div>
     </form>
   );

@@ -41,7 +41,9 @@ function EditDraft() {
   const data = Route.useLoaderData();
   const { guardado } = Route.useSearch();
   const user = useSessionUser();
+  const router = useRouter();
   const [saved, setSaved] = useState(guardado === true);
+  const [justPublished, setJustPublished] = useState(false);
 
   if (user?.role !== "provider") return <ProviderOnly />;
 
@@ -77,18 +79,41 @@ function EditDraft() {
         <ChevronLeft aria-hidden className="size-4" />
         Mis anuncios
       </BackLink>
-      {saved && (
-        <Notice icon={<CircleCheck />} title="Borrador guardado" className="max-w-xl">
-          Puedes cerrar la página y seguir más tarde: lo encontrarás en tus anuncios.
-        </Notice>
+      {draft.status === "published" ? (
+        <>
+          <Notice
+            icon={<CircleCheck />}
+            title={justPublished ? "Anuncio publicado" : "Este anuncio está publicado"}
+            className="max-w-xl"
+          >
+            Los visitantes ya pueden encontrarlo en el catálogo a su precio normal.
+          </Notice>
+          <div>
+            <PageButton to="/experiencias/$id" params={{ id: String(draft.id) }}>
+              Ver en el catálogo
+            </PageButton>
+          </div>
+        </>
+      ) : (
+        <>
+          {saved && (
+            <Notice icon={<CircleCheck />} title="Borrador guardado" className="max-w-xl">
+              Puedes cerrar la página y seguir más tarde: lo encontrarás en tus anuncios.
+            </Notice>
+          )}
+          <DraftForm
+            key={draft.id}
+            draft={draft}
+            onSaved={async () => {
+              setSaved(true);
+            }}
+            onPublished={async () => {
+              setJustPublished(true);
+              await router.invalidate();
+            }}
+          />
+        </>
       )}
-      <DraftForm
-        key={draft.id}
-        draft={draft}
-        onSaved={async () => {
-          setSaved(true);
-        }}
-      />
     </ProviderPage>
   );
 }
