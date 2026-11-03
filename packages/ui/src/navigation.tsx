@@ -1,4 +1,14 @@
-import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
+import {
+  type AnchorHTMLAttributes,
+  type ButtonHTMLAttributes,
+  type HTMLAttributes,
+  type ReactNode,
+  type Ref,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { NewTag } from "./badges";
 import { Menu, User } from "./icons";
 import { cx, focusRing } from "./utils";
@@ -43,14 +53,19 @@ export function TopNav({ brand, center, actions, className }: TopNavProps) {
   );
 }
 
-export type AccountButtonProps = ButtonHTMLAttributes<HTMLButtonElement>;
+export type AccountButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  /** Nombre del usuario con sesión; en móvil solo se ve el avatar. */
+  name?: string;
+  /** Avatar del usuario; sin él, el icono genérico de persona. */
+  avatar?: ReactNode;
+};
 
-/** Pastilla de cuenta (menú + avatar) del extremo derecho de la barra superior. */
-export function AccountButton({ className, ...props }: AccountButtonProps) {
+/** Pastilla de cuenta (menú + nombre + avatar) del extremo derecho de la barra superior. */
+export function AccountButton({ name, avatar, className, ...props }: AccountButtonProps) {
   return (
     <button
       type="button"
-      aria-label="Menú de cuenta"
+      aria-label={name ? `Menú de cuenta: ${name}` : "Menú de cuenta"}
       className={cx(
         "inline-flex h-11 items-center gap-3 rounded-full border border-hairline bg-canvas pr-1.5 pl-3.5 text-ink transition-shadow hover:shadow-float",
         focusRing,
@@ -59,10 +74,126 @@ export function AccountButton({ className, ...props }: AccountButtonProps) {
       {...props}
     >
       <Menu aria-hidden className="size-4" />
-      <span className="inline-flex size-8 items-center justify-center rounded-full bg-muted text-on-primary">
-        <User aria-hidden className="size-4" />
-      </span>
+      {name && (
+        <span className="hidden max-w-40 truncate text-body-sm font-medium md:inline">{name}</span>
+      )}
+      {avatar ?? (
+        <span className="inline-flex size-8 items-center justify-center rounded-full bg-muted text-on-primary">
+          <User aria-hidden className="size-4" />
+        </span>
+      )}
     </button>
+  );
+}
+
+export type AccountMenuProps = Pick<AccountButtonProps, "name" | "avatar"> & {
+  /** AccountMenuLink, AccountMenuButton y AccountMenuDivider. */
+  children: ReactNode;
+  className?: string;
+};
+
+/** Pastilla de cuenta que despliega un panel con las opciones de la cuenta. */
+export function AccountMenu({ name, avatar, children, className }: AccountMenuProps) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    // Elegir una opción (enlace o botón) cierra el panel.
+    const chosen = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (panelRef.current?.contains(target) && target.closest("a, button")) setOpen(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("click", chosen);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("click", chosen);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className={cx("relative", className)}>
+      <AccountButton
+        name={name}
+        avatar={avatar}
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((value) => !value)}
+      />
+      {open && (
+        <div
+          ref={panelRef}
+          id={panelId}
+          className="absolute top-full right-0 z-20 mt-2 flex w-60 flex-col rounded-md border border-hairline bg-canvas py-2 shadow-float"
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const menuItemClass = (strong: boolean) =>
+  cx(
+    "flex w-full items-center px-4 py-3 text-left text-body-md text-ink hover:bg-surface-soft",
+    strong && "font-semibold",
+    focusRing,
+  );
+
+export type AccountMenuLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+  ref?: Ref<HTMLAnchorElement>;
+  /** Opción principal, en negrita ("Iniciar sesión"). */
+  strong?: boolean;
+};
+
+/** Opción del menú de cuenta que lleva a otra página. Con TanStack Router: `createLink(AccountMenuLink)`. */
+export function AccountMenuLink({
+  strong = false,
+  className,
+  ref,
+  ...props
+}: AccountMenuLinkProps) {
+  return <a ref={ref} className={cx(menuItemClass(strong), className)} {...props} />;
+}
+
+export type AccountMenuButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { strong?: boolean };
+
+/** Opción del menú de cuenta que hace una acción ("Cerrar sesión"). */
+export function AccountMenuButton({ strong = false, className, ...props }: AccountMenuButtonProps) {
+  return <button type="button" className={cx(menuItemClass(strong), className)} {...props} />;
+}
+
+export function AccountMenuDivider() {
+  return <hr className="my-2 border-0 border-t border-hairline" />;
+}
+
+export type TopNavLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+  ref?: Ref<HTMLAnchorElement>;
+};
+
+/** Enlace de texto de la barra superior ("Publica tu vehículo"). Con TanStack Router: `createLink(TopNavLink)`. */
+export function TopNavLink({ className, ref, ...props }: TopNavLinkProps) {
+  return (
+    <a
+      ref={ref}
+      className={cx(
+        "inline-flex h-11 items-center gap-2 rounded-full px-3 text-body-sm font-medium whitespace-nowrap text-ink transition-colors hover:bg-surface-soft [&_svg]:size-4",
+        focusRing,
+        className,
+      )}
+      {...props}
+    />
   );
 }
 
