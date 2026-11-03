@@ -1,54 +1,46 @@
 import {
   Avatar,
+  Button,
   ButtonLink,
-  Container,
-  EmptyState,
+  Divider,
   Heading,
-  Logo,
-  Section,
+  Notice,
+  Plus,
   Text,
-  TopNav,
-  User,
+  TextLink,
 } from "@luxydrive/ui";
-import { createFileRoute, createLink, Link, redirect } from "@tanstack/react-router";
-import type { ReactNode } from "react";
-import { AccountNav } from "../account-nav";
+import { createFileRoute, createLink, useRouter } from "@tanstack/react-router";
+import { client } from "../api";
+import { categoryOptions } from "../draft-form";
+import { ProviderOnly, ProviderPage, requireSession } from "../provider-page";
 import { loadSession, useSessionUser } from "../session";
 
 export const Route = createFileRoute("/proveedor/")({
-  // Zona privada: sin sesión, a iniciar sesión y de vuelta aquí.
-  beforeLoad: async ({ location }) => {
-    if (!(await loadSession())) {
-      throw redirect({ to: "/acceso", search: { redirect: location.href } });
-    }
+  beforeLoad: requireSession,
+  loader: async () => {
+    // A un cliente no le pedimos sus anuncios: la página le explica que es zona de proveedor.
+    if ((await loadSession())?.role !== "provider") return [];
+    const res = await client.api.provider.experiences.$get();
+    if (!res.ok) throw new Error("listings_unavailable");
+    return res.json();
   },
+  errorComponent: ListingsError,
   component: ProviderHome,
 });
 
 const PageButton = createLink(ButtonLink);
+const ListingLink = createLink(TextLink);
+
+const categoryLabel = Object.fromEntries(
+  categoryOptions.map((option) => [option.value, option.label]),
+);
 
 function ProviderHome() {
   const user = useSessionUser();
+  const listings = Route.useLoaderData();
 
   if (!user) return <ProviderPage>{null}</ProviderPage>;
-
-  // La API responde 403 a un cliente en /api/provider/*; aquí se lo explicamos antes de que lo intente.
-  if (user.role !== "provider") {
-    return (
-      <ProviderPage>
-        <EmptyState
-          icon={<User aria-hidden />}
-          title="Esta zona es solo para proveedores"
-          description="Has entrado con una cuenta de cliente. Publicar experiencias y gestionar una empresa son funciones de las cuentas de proveedor."
-          action={
-            <PageButton to="/experiencias" variant="secondary">
-              Ver experiencias
-            </PageButton>
-          }
-        />
-      </ProviderPage>
-    );
-  }
+  if (user.role !== "provider") return <ProviderOnly />;
 
   return (
     <ProviderPage>
@@ -64,30 +56,83 @@ function ProviderHome() {
       <Text tone="body">
         Empieza por el perfil de tu empresa: es lo que verán los clientes junto a tus anuncios.
       </Text>
-      <div>
+      <div className="flex flex-wrap gap-3">
         {/* El perfil (US-008) es otra historia: enlace normal, no ruta tipada. */}
-        <ButtonLink href="/proveedor/perfil">Crear el perfil de empresa</ButtonLink>
+        <ButtonLink href="/proveedor/perfil" variant="secondary">
+          Perfil de empresa
+        </ButtonLink>
+        <PageButton to="/proveedor/anuncios/nuevo">
+          <Plus aria-hidden className="size-4" />
+          Nuevo anuncio
+        </PageButton>
       </div>
+      <Divider />
+      <section aria-labelledby="my-listings" className="flex flex-col gap-4">
+        <Heading as="h2" id="my-listings" variant="display-sm">
+          Tus anuncios
+        </Heading>
+        {listings.length === 0 ? (
+          <Text tone="muted">
+            Aún no tienes anuncios. Crea uno: puedes guardarlo como borrador y terminarlo después.
+          </Text>
+        ) : (
+          <ul className="flex flex-col divide-y divide-hairline">
+            {listings.map((listing) => (
+              <li
+                key={listing.id}
+                className="flex flex-wrap items-center justify-between gap-2 py-4"
+              >
+                <div className="flex min-w-0 flex-col gap-1">
+                  <ListingLink
+                    to="/proveedor/anuncios/$id"
+                    params={{ id: String(listing.id) }}
+                    className="break-words"
+                  >
+                    {listing.title}
+                  </ListingLink>
+                  <Text variant="body-sm" tone="muted">
+                    {[listing.category && categoryLabel[listing.category], listing.location]
+                      .filter(Boolean)
+                      .join(" · ") || "Sin categoría ni ubicación todavía"}
+                  </Text>
+                </div>
+                <Text
+                  as="span"
+                  variant="body-sm"
+                  tone={listing.status === "draft" ? "muted" : "ink"}
+                >
+                  {listing.status === "draft" ? "Borrador" : "Publicado"}
+                </Text>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </ProviderPage>
   );
 }
 
-function ProviderPage({ children }: { children: ReactNode }) {
+function ListingsError() {
+  const router = useRouter();
+
   return (
-    <>
-      <TopNav
-        brand={
-          <Link to="/" aria-label="LuxyDrive, inicio" className="mb-3 md:mb-0">
-            <Logo />
-          </Link>
+    <ProviderPage>
+      <Notice
+        tone="error"
+        title="No se han podido cargar tus anuncios"
+        action={
+          <Button
+            variant="tertiary"
+            size="sm"
+            className="h-auto"
+            onClick={() => router.invalidate()}
+          >
+            Reintentar
+          </Button>
         }
-        actions={<AccountNav />}
-      />
-      <main>
-        <Container size="narrow">
-          <Section className="flex flex-col gap-6">{children}</Section>
-        </Container>
-      </main>
-    </>
+      >
+        Comprueba tu conexión e inténtalo de nuevo.
+      </Notice>
+    </ProviderPage>
   );
 }
