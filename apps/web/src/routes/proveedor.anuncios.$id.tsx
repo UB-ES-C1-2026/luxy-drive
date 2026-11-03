@@ -7,19 +7,21 @@ import {
   Notice,
   Search,
   Skeleton,
+  Text,
   TextLink,
 } from "@luxydrive/ui";
-import { createFileRoute, createLink, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, createLink, useNavigate, useRouter } from "@tanstack/react-router";
 import { client } from "../api";
-import { DraftForm } from "../draft-form";
+import { type Draft, DraftStep, steps } from "../draft-wizard";
 import { ProviderOnly, ProviderPage, requireSession } from "../provider-page";
 import { useSessionUser } from "../session";
 
 export const Route = createFileRoute("/proveedor/anuncios/$id")({
-  validateSearch: (search: Record<string, unknown>): { guardado?: boolean } => ({
-    guardado: search.guardado === true ? true : undefined,
-  }),
+  // Sin `paso` se ve el resumen del anuncio; con `paso`, esa pregunta.
+  validateSearch: (search: Record<string, unknown>): { paso?: number } => {
+    const step = Number(search.paso);
+    return { paso: Number.isInteger(step) && step >= 1 && step <= steps.length ? step : undefined };
+  },
   beforeLoad: requireSession,
   loader: async ({ params }) => {
     const res = await client.api.provider.experiences[":id"].$get({ param: { id: params.id } });
@@ -31,19 +33,19 @@ export const Route = createFileRoute("/proveedor/anuncios/$id")({
   },
   pendingComponent: DraftLoading,
   errorComponent: DraftError,
-  component: EditDraft,
+  component: DraftPage,
 });
 
 const BackLink = createLink(TextLink);
 const PageButton = createLink(ButtonLink);
+const EditLink = createLink(TextLink);
 
-function EditDraft() {
+function DraftPage() {
   const data = Route.useLoaderData();
-  const { guardado } = Route.useSearch();
+  const { paso } = Route.useSearch();
   const user = useSessionUser();
   const router = useRouter();
-  const [saved, setSaved] = useState(guardado === true);
-  const [justPublished, setJustPublished] = useState(false);
+  const navigate = useNavigate({ from: Route.fullPath });
 
   if (user?.role !== "provider") return <ProviderOnly />;
 
@@ -66,6 +68,36 @@ function EditDraft() {
 
   const { draft } = data;
 
+  if (paso !== undefined && draft.status === "draft") {
+    const goTo = async (step: number | undefined) => {
+      await navigate({ search: { paso: step } });
+      await router.invalidate();
+    };
+    return (
+      <ProviderPage>
+        <DraftStep
+          key={`${draft.id}-${paso}`}
+          draft={draft}
+          index={paso - 1}
+          onSaved={async (_saved, exit) => {
+            if (exit) {
+              await navigate({ to: "/proveedor" });
+              return;
+            }
+            await goTo(paso < steps.length ? paso + 1 : undefined);
+          }}
+          onBack={paso > 1 ? () => goTo(paso - 1) : undefined}
+        />
+      </ProviderPage>
+    );
+  }
+
+  return <DraftSummary draft={draft} />;
+}
+
+function DraftSummary({ draft }: { draft: Draft }) {
+  const pending = steps.findIndex((step) => !step.read(draft).trim());
+
   return (
     <ProviderPage
       title={draft.title}
@@ -79,40 +111,47 @@ function EditDraft() {
         <ChevronLeft aria-hidden className="size-4" />
         Mis anuncios
       </BackLink>
-      {draft.status === "published" ? (
-        <>
-          <Notice
-            icon={<CircleCheck />}
-            title={justPublished ? "Anuncio publicado" : "Este anuncio está publicado"}
-            className="max-w-xl"
-          >
-            Los visitantes ya pueden encontrarlo en el catálogo a su precio normal.
-          </Notice>
-          <div>
-            <PageButton to="/experiencias/$id" params={{ id: String(draft.id) }}>
-              Ver en el catálogo
-            </PageButton>
-          </div>
-        </>
-      ) : (
-        <>
-          {saved && (
-            <Notice icon={<CircleCheck />} title="Borrador guardado" className="max-w-xl">
-              Puedes cerrar la página y seguir más tarde: lo encontrarás en tus anuncios.
-            </Notice>
-          )}
-          <DraftForm
-            key={draft.id}
-            draft={draft}
-            onSaved={async () => {
-              setSaved(true);
-            }}
-            onPublished={async () => {
-              setJustPublished(true);
-              await router.invalidate();
-            }}
-          />
-        </>
+      {draft.status === "draft" && (
+        <Notice icon={<CircleCheck />} title="Borrador guardado" className="max-w-2xl">
+          Cada respuesta se guarda al pasar a la siguiente. Puedes salir y seguir otro día.
+        </Notice>
+      )}
+      <dl className="flex max-w-2xl flex-col divide-y divide-hairline border-y border-hairline">
+        {steps.map((step, index) => {
+          const shown = (step.show ?? step.read)(draft).trim();
+          return (
+            <div key={step.field} className="flex items-start justify-between gap-4 py-4">
+              <div className="flex min-w-0 flex-col gap-1">
+                <dt>
+                  <Text as="span" variant="caption" tone="muted">
+                    {step.label}
+                  </Text>
+                </dt>
+                <dd className="break-words whitespace-pre-line">
+                  <Text as="span" tone={shown ? "ink" : "muted"}>
+                    {shown || "Sin rellenar"}
+                  </Text>
+                </dd>
+              </div>
+              {draft.status === "draft" && (
+                <EditLink
+                  from={Route.fullPath}
+                  search={{ paso: index + 1 }}
+                  aria-label={`Editar: ${step.label}`}
+                >
+                  Editar
+                </EditLink>
+              )}
+            </div>
+          );
+        })}
+      </dl>
+      {draft.status === "draft" && pending >= 0 && (
+        <div>
+          <PageButton from={Route.fullPath} search={{ paso: pending + 1 }}>
+            Seguir rellenando
+          </PageButton>
+        </div>
       )}
     </ProviderPage>
   );
@@ -125,12 +164,11 @@ function DraftLoading() {
         role="status"
         aria-busy="true"
         aria-label="Cargando el anuncio"
-        className="flex max-w-xl flex-col gap-5"
+        className="flex max-w-2xl flex-col gap-6"
       >
-        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-1" />
+        <Skeleton className="h-10 w-96 max-w-full" />
         <Skeleton className="h-14" />
-        <Skeleton className="h-14" />
-        <Skeleton className="h-28" />
       </div>
     </ProviderPage>
   );
