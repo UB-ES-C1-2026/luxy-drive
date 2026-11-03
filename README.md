@@ -37,7 +37,7 @@ Cada entorno es **un solo Worker de Cloudflare**: sirve los archivos estáticos 
 
 ### Sistema de diseño
 
-Todos los componentes del front están en `@luxydrive/ui` y siguen `DESIGN.md`. Puedes verlos funcionando en el **catálogo de componentes**: https://dev.luxydrive.workers.dev
+Todos los componentes del front están en `@luxydrive/ui` y siguen `DESIGN.md`. Puedes verlos funcionando en el **catálogo de componentes**: https://dev.luxydrive.workers.dev/componentes (la portada, `/`, lleva al catálogo de experiencias)
 
 Antes de hacer una pantalla, mira el catálogo y móntala con esos componentes. Si falta alguno, créalo en `packages/ui` siguiendo `DESIGN.md` (ver [AGENTS.md](AGENTS.md)).
 
