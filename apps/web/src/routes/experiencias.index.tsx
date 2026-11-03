@@ -25,6 +25,7 @@ import {
 } from "@luxydrive/ui";
 import { createFileRoute, createLink, Link, useRouter } from "@tanstack/react-router";
 import { type FormEvent, type ReactNode, useState } from "react";
+import { AccountNav } from "../account-nav";
 import { client } from "../api";
 
 const categories = ["jet", "yacht", "camper"] as const satisfies readonly ListingCategory[];
@@ -363,10 +364,13 @@ function CatalogPage({ subtitle, children }: { subtitle?: string; children: Reac
         }
         center={<CategoryFilter />}
         actions={
-          <OffersButton to="/ofertas" variant="secondary" size="sm" className="mb-3 md:mb-0">
-            <Sparkles aria-hidden className="size-4" />
-            Ver ofertas
-          </OffersButton>
+          <>
+            <OffersButton to="/ofertas" variant="secondary" size="sm" className="mb-3 md:mb-0">
+              <Sparkles aria-hidden className="size-4" />
+              Ver ofertas
+            </OffersButton>
+            <AccountNav />
+          </>
         }
       />
       <main>
