@@ -1,4 +1,4 @@
-import { Avatar, ButtonLink, Text } from "@luxydrive/ui";
+import { Avatar, ButtonLink, Text, User } from "@luxydrive/ui";
 import { createLink } from "@tanstack/react-router";
 import { useSessionUser } from "./session";
 
@@ -10,8 +10,16 @@ export function AccountNav() {
 
   if (!user) {
     return (
-      <NavButton to="/registro" variant="secondary" size="sm" className="mb-3 md:mb-0">
-        Crear cuenta
+      // En móvil solo el icono: con "Ver ofertas" no cabe el texto.
+      <NavButton
+        to="/registro"
+        variant="secondary"
+        size="sm"
+        aria-label="Crear cuenta"
+        className="mb-3 md:mb-0"
+      >
+        <User aria-hidden className="size-4" />
+        <span className="hidden md:inline">Crear cuenta</span>
       </NavButton>
     );
   }
