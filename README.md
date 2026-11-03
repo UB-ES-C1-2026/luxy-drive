@@ -287,6 +287,21 @@ inicia la sesión (cookie `luxydrive_session`) y devuelve `201` con
 - Tablas `users` y `sessions` (migración `create_users`), según SP-002. La contraseña se
   guarda con hash y nunca aparece en respuestas ni logs.
 
+### API de acceso y cierre de sesión (US-007.b)
+
+- `POST /api/auth/login` con `{ "email", "password" }`: si son correctos, inicia una sesión
+  nueva (cookie `luxydrive_session`, 7 días) y devuelve `200` con `{ "id", "name", "role" }`.
+  Contraseña incorrecta y email inexistente responden igual: `401` e `invalid_credentials`.
+  Un cuerpo sin email o contraseña responde `400` e `invalid_body`.
+- `POST /api/auth/logout`: borra la sesión en D1 y caduca la cookie. Responde `204` también sin
+  sesión. Las sesiones de otros dispositivos siguen activas.
+- `GET /api/auth/me`: usuario de la sesión actual (`200` con `{ "id", "name", "role" }`) o `401`
+  y `unauthorized`. Sirve al frontend para proteger las páginas privadas.
+- Desde el frontend: `client.api.auth.login.$post({ json })`, `client.api.auth.logout.$post()`
+  y `client.api.auth.me.$get()`.
+- Las rutas privadas usan el middleware `requireUser` (`apps/api/src/auth/session.ts`), que
+  responde `401` sin sesión válida o con la sesión caducada.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.

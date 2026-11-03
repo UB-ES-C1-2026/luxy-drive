@@ -1,21 +1,27 @@
 import {
   Avatar,
+  Button,
   ButtonLink,
   Container,
-  EmptyState,
   Heading,
   Logo,
+  Notice,
   Section,
   Text,
   TopNav,
-  User,
 } from "@luxydrive/ui";
-import { createFileRoute, createLink, Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { createFileRoute, createLink, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { type ReactNode, useState } from "react";
 import { AccountNav } from "../account-nav";
-import { useSessionUser } from "../session";
+import { loadSession, logout, useSessionUser } from "../session";
 
 export const Route = createFileRoute("/cuenta")({
+  // Página privada: sin sesión, a iniciar sesión y de vuelta aquí.
+  beforeLoad: async ({ location }) => {
+    if (!(await loadSession())) {
+      throw redirect({ to: "/acceso", search: { redirect: location.href } });
+    }
+  },
   component: Account,
 });
 
@@ -25,22 +31,32 @@ const roleLabel = { client: "Cuenta de cliente", provider: "Cuenta de proveedor"
 
 function Account() {
   const user = useSessionUser();
+  const navigate = useNavigate();
+  const [leaving, setLeaving] = useState(false);
+  const [failed, setFailed] = useState(false);
 
-  if (!user) {
-    return (
-      <AccountPage>
-        <EmptyState
-          icon={<User aria-hidden />}
-          title="No has entrado en tu cuenta"
-          description="Crea una cuenta para reservar experiencias."
-          action={<PageButton to="/registro">Crear cuenta</PageButton>}
-        />
-      </AccountPage>
-    );
-  }
+  // Tras cerrar sesión el componente aún se pinta un instante antes de navegar.
+  if (!user) return <AccountPage>{null}</AccountPage>;
+
+  const signOut = async () => {
+    setFailed(false);
+    setLeaving(true);
+    try {
+      await logout();
+      await navigate({ to: "/experiencias" });
+    } catch {
+      setFailed(true);
+      setLeaving(false);
+    }
+  };
 
   return (
     <AccountPage>
+      {failed && (
+        <Notice tone="error" title="No se ha podido cerrar la sesión">
+          Comprueba tu conexión e inténtalo de nuevo.
+        </Notice>
+      )}
       <div className="flex items-center gap-4">
         <Avatar name={user.name} size="lg" />
         <div className="flex min-w-0 flex-col gap-1">
@@ -51,8 +67,11 @@ function Account() {
         </div>
       </div>
       <Text tone="body">Tu sesión está iniciada. Ya puedes explorar y reservar experiencias.</Text>
-      <div>
+      <div className="flex flex-wrap gap-3">
         <PageButton to="/experiencias">Ver experiencias</PageButton>
+        <Button variant="secondary" onClick={signOut} disabled={leaving}>
+          {leaving ? "Cerrando sesión…" : "Cerrar sesión"}
+        </Button>
       </div>
     </AccountPage>
   );
