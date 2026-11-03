@@ -50,6 +50,10 @@ it("saves a listing with only the title as a draft", async () => {
     vehicle: null,
     location: null,
     capacity: null,
+    price: null,
+    currency: "EUR",
+    priceUnit: "experiencia completa",
+    serviceAt: null,
     status: "draft",
   });
 });
