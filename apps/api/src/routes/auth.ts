@@ -1,5 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import { createFactory } from "hono/factory";
 import { hashPassword, verifyPassword } from "../auth/password";
 import {
   type AuthEnv,
@@ -12,10 +13,11 @@ import {
 } from "../auth/session";
 import { loginBody, signupBody, signupError } from "../schemas/signup";
 
-export const auth = new Hono<AuthEnv>()
-  .use(sameOrigin)
-  .post(
-    "/signup",
+const factory = createFactory<AuthEnv>();
+
+// The role comes from the endpoint, never from the request body.
+function signupAs<R extends SessionUser["role"]>(role: R) {
+  return factory.createHandlers(
     zValidator("json", signupBody, (result, c) => {
       if (!result.success) return c.json({ error: signupError(result.error) }, 400);
     }),
@@ -28,8 +30,8 @@ export const auth = new Hono<AuthEnv>()
         const passwordHash = await hashPassword(password, c.env.AUTH_PEPPER);
         const [inserted] = await c.env.DB.batch<{ id: number }>([
           c.env.DB.prepare(
-            "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'client') RETURNING id",
-          ).bind(name, normalizedEmail, passwordHash),
+            "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?) RETURNING id",
+          ).bind(name, normalizedEmail, passwordHash, role),
           c.env.DB.prepare(
             "INSERT INTO sessions (token_hash, user_id, expires_at) SELECT ?, id, ? FROM users WHERE email = ?",
           ).bind(session.tokenHash, session.expiresAt, normalizedEmail),
@@ -37,7 +39,7 @@ export const auth = new Hono<AuthEnv>()
         const user = inserted?.results[0];
         if (!user) return c.json({ error: "internal_error" } as const, 500);
         setSessionCookie(c, session.token);
-        return c.json({ id: user.id, name, role: "client" as const }, 201);
+        return c.json({ id: user.id, name, role }, 201);
       } catch (error) {
         if (String(error).includes("UNIQUE constraint failed: users.email")) {
           return c.json({ error: "email_exists" } as const, 409);
@@ -45,7 +47,13 @@ export const auth = new Hono<AuthEnv>()
         return c.json({ error: "internal_error" } as const, 500);
       }
     },
-  )
+  );
+}
+
+export const auth = new Hono<AuthEnv>()
+  .use(sameOrigin)
+  .post("/signup", ...signupAs("client"))
+  .post("/signup/provider", ...signupAs("provider"))
   .post(
     "/login",
     zValidator("json", loginBody, (result, c) => {

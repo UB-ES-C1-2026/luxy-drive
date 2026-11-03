@@ -64,8 +64,11 @@ function Login() {
         json: { email: values.email.trim(), password: values.password },
       });
       if (res.status === 200) {
-        setSessionUser(await res.json());
-        return router.history.push(redirect ?? "/cuenta");
+        const user = await res.json();
+        setSessionUser(user);
+        return router.history.push(
+          redirect ?? (user.role === "provider" ? "/proveedor" : "/cuenta"),
+        );
       }
       // Email inexistente y contraseña incorrecta dan el mismo 401: no revelamos qué cuentas existen.
       setProblem(res.status === 401 ? "credentials" : "network");
