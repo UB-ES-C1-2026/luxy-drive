@@ -7,6 +7,7 @@ export {
   Calendar,
   CalendarDays,
   Caravan,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleAlert,

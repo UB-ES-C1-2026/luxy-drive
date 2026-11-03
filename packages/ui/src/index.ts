@@ -27,6 +27,9 @@ export { Footer, type FooterColumn, type FooterProps } from "./footer";
 export {
   Chip,
   type ChipProps,
+  Select,
+  type SelectOption,
+  type SelectProps,
   Stepper,
   type StepperProps,
   TextArea,

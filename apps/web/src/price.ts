@@ -9,3 +9,18 @@ export function splitPrice(total: number, people: number) {
   const extra = cents - base * people;
   return { base: base / 100, higher: (base + 1) / 100, extra };
 }
+
+/**
+ * Lee un precio escrito a mano en EUR: "1200", "1.200", "1200,50" o "1200.50".
+ * Devuelve `null` si es negativo, tiene más de dos decimales o no es un número.
+ */
+export function parsePrice(text: string) {
+  const compact = text.replace(/\s|€/g, "");
+  // Con coma decimal, los puntos son separadores de miles; sin coma, "1.200" también lo es.
+  const normalized = compact.includes(",")
+    ? compact.replace(/\./g, "").replace(",", ".")
+    : /^\d{1,3}(\.\d{3})+$/.test(compact)
+      ? compact.replace(/\./g, "")
+      : compact;
+  return /^\d+(\.\d{1,2})?$/.test(normalized) ? Number(normalized) : null;
+}
