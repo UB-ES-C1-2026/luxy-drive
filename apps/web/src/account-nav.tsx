@@ -20,10 +20,11 @@ export function AccountNav() {
   // Proveedores, a su zona; visitantes, a darse de alta como proveedor. Una cuenta de
   // cliente es para reservar, así que no se le ofrece.
   const providerArea = user?.role === "provider" ? "/proveedor" : "/proveedor/registro";
+  const publishTo = user?.role === "provider" ? "/proveedor/anuncios/nuevo" : "/proveedor/registro";
   const publish = user?.role !== "client" && (
     // En móvil no cabe en la barra: está dentro del menú.
     <span className="hidden md:block">
-      <NavLink to={providerArea}>Publica tu vehículo</NavLink>
+      <NavLink to={publishTo}>Publica tu vehículo</NavLink>
     </span>
   );
 

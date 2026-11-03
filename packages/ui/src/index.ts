@@ -27,6 +27,9 @@ export { Footer, type FooterColumn, type FooterProps } from "./footer";
 export {
   Chip,
   type ChipProps,
+  Select,
+  type SelectOption,
+  type SelectProps,
   Stepper,
   type StepperProps,
   TextArea,
@@ -93,3 +96,10 @@ export { ColorSwatch, type ColorSwatchProps } from "./swatch";
 export { TextLink, type TextLinkProps } from "./text-link";
 export { Heading, type HeadingProps, Text, type TextProps } from "./typography";
 export { cx, formatPrice, formatPriceCents } from "./utils";
+export {
+  ChoiceCards,
+  type ChoiceCardsProps,
+  type ChoiceOption,
+  StepProgress,
+  type StepProgressProps,
+} from "./wizard";
