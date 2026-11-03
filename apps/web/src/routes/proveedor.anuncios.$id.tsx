@@ -11,6 +11,7 @@ import {
   TextLink,
 } from "@luxydrive/ui";
 import { createFileRoute, createLink, useNavigate, useRouter } from "@tanstack/react-router";
+import { useState } from "react";
 import { client } from "../api";
 import { type Draft, DraftStep, steps } from "../draft-wizard";
 import { ProviderOnly, ProviderPage, requireSession } from "../provider-page";
@@ -95,30 +96,99 @@ function DraftPage() {
   return <DraftSummary draft={draft} />;
 }
 
+type PublishProblem = { title: string; body: string; fields: string[] };
+
 function DraftSummary({ draft }: { draft: Draft }) {
+  const router = useRouter();
+  const [problem, setProblem] = useState<PublishProblem | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [justPublished, setJustPublished] = useState(false);
   const pending = steps.findIndex((step) => !step.read(draft).trim());
+  const isDraft = draft.status === "draft";
+
+  const publish = async () => {
+    setProblem(null);
+    setPublishing(true);
+    try {
+      const res = await client.api.provider.experiences[":id"].publish.$post({
+        param: { id: String(draft.id) },
+      });
+      if (res.ok) {
+        setJustPublished(true);
+        return await router.invalidate();
+      }
+      const status: number = res.status;
+      if (status === 400) {
+        const body = await res.json();
+        if ("fields" in body) {
+          // La API dice exactamente qué falta: se resume arriba y se marca en cada fila.
+          const missing: string[] = body.fields;
+          const labels = steps.filter((step) => missing.includes(step.field));
+          return setProblem({
+            title: `Para publicar falta: ${labels.map((step) => step.label).join(", ")}`,
+            body: "El anuncio sigue siendo un borrador y no aparece en el catálogo.",
+            fields: labels.map((step) => step.field),
+          });
+        }
+        if (body.error === "service_at_in_past") {
+          return setProblem({
+            title: "La fecha de servicio ya ha pasado",
+            body: "Cambia la fecha y hora por una futura y vuelve a publicar. El anuncio sigue oculto.",
+            fields: ["serviceAt"],
+          });
+        }
+      }
+      if (status === 409) return await router.invalidate();
+      setProblem({
+        title: "No se ha podido publicar",
+        body: "Comprueba tu conexión e inténtalo de nuevo.",
+        fields: [],
+      });
+    } catch {
+      setProblem({
+        title: "No se ha podido publicar",
+        body: "Comprueba tu conexión e inténtalo de nuevo.",
+        fields: [],
+      });
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   return (
     <ProviderPage
       title={draft.title}
       subtitle={
-        draft.status === "draft"
-          ? "Borrador: no aparece en el catálogo."
-          : "Publicado: ya aparece en el catálogo."
+        isDraft ? "Borrador: no aparece en el catálogo." : "Publicado: ya aparece en el catálogo."
       }
     >
       <BackLink to="/proveedor" className="inline-flex items-center gap-1 self-start">
         <ChevronLeft aria-hidden className="size-4" />
         Mis anuncios
       </BackLink>
-      {draft.status === "draft" && (
+      {isDraft && !problem && (
         <Notice icon={<CircleCheck />} title="Borrador guardado" className="max-w-2xl">
           Cada respuesta se guarda al pasar a la siguiente. Puedes salir y seguir otro día.
+        </Notice>
+      )}
+      {problem && (
+        <Notice tone="error" title={problem.title} className="max-w-2xl">
+          {problem.body}
+        </Notice>
+      )}
+      {!isDraft && (
+        <Notice
+          icon={<CircleCheck />}
+          title={justPublished ? "Anuncio publicado" : "Este anuncio está publicado"}
+          className="max-w-2xl"
+        >
+          Los visitantes ya pueden encontrarlo en el catálogo a su precio normal.
         </Notice>
       )}
       <dl className="flex max-w-2xl flex-col divide-y divide-hairline border-y border-hairline">
         {steps.map((step, index) => {
           const shown = (step.show ?? step.read)(draft).trim();
+          const missing = problem?.fields.includes(step.field) ?? false;
           return (
             <div key={step.field} className="flex items-start justify-between gap-4 py-4">
               <div className="flex min-w-0 flex-col gap-1">
@@ -127,32 +197,48 @@ function DraftSummary({ draft }: { draft: Draft }) {
                     {step.label}
                   </Text>
                 </dt>
-                <dd className="break-words whitespace-pre-line">
+                <dd className="flex flex-col gap-1 break-words whitespace-pre-line">
                   <Text as="span" tone={shown ? "ink" : "muted"}>
                     {shown || "Sin rellenar"}
                   </Text>
+                  {missing && (
+                    <Text as="span" variant="body-sm" tone="error">
+                      {shown ? "Cámbiala por una fecha futura." : "Falta para publicar."}
+                    </Text>
+                  )}
                 </dd>
               </div>
-              {draft.status === "draft" && (
+              {isDraft && (
                 <EditLink
                   from={Route.fullPath}
                   search={{ paso: index + 1 }}
                   aria-label={`Editar: ${step.label}`}
                 >
-                  Editar
+                  {missing ? "Completar" : "Editar"}
                 </EditLink>
               )}
             </div>
           );
         })}
       </dl>
-      {draft.status === "draft" && pending >= 0 && (
-        <div>
-          <PageButton from={Route.fullPath} search={{ paso: pending + 1 }}>
-            Seguir rellenando
+      <div className="flex flex-wrap gap-3">
+        {isDraft ? (
+          <>
+            <Button onClick={publish} disabled={publishing}>
+              {publishing ? "Publicando…" : "Publicar anuncio"}
+            </Button>
+            {pending >= 0 && (
+              <PageButton from={Route.fullPath} search={{ paso: pending + 1 }} variant="secondary">
+                Seguir rellenando
+              </PageButton>
+            )}
+          </>
+        ) : (
+          <PageButton to="/experiencias/$id" params={{ id: String(draft.id) }}>
+            Ver en el catálogo
           </PageButton>
-        </div>
-      )}
+        )}
+      </div>
     </ProviderPage>
   );
 }
