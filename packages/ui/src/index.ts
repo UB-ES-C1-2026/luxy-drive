@@ -29,6 +29,8 @@ export {
   type ChipProps,
   Stepper,
   type StepperProps,
+  TextArea,
+  type TextAreaProps,
   TextInput,
   type TextInputProps,
 } from "./forms";
