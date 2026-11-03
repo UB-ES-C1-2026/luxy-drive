@@ -2,6 +2,8 @@ import { Button, type ListingCategory, Notice, Select, TextArea, TextInput } fro
 import type { InferResponseType } from "hono/client";
 import { type FormEvent, useState } from "react";
 import { client } from "./api";
+import { nowInMadrid, toMadridLocal } from "./madrid-time";
+import { parsePrice } from "./price";
 
 export type Draft = InferResponseType<(typeof client.api.provider.experiences)[":id"]["$get"], 200>;
 
@@ -11,10 +13,21 @@ type Fields = {
   vehicle: string;
   location: string;
   capacity: string;
+  price: string;
+  serviceAt: string;
   description: string;
 };
 type Field = keyof Fields;
-const fieldOrder = ["title", "category", "vehicle", "location", "capacity", "description"] as const;
+const fieldOrder = [
+  "title",
+  "category",
+  "vehicle",
+  "location",
+  "capacity",
+  "price",
+  "serviceAt",
+  "description",
+] as const;
 
 export const categoryOptions: { value: ListingCategory; label: string }[] = [
   { value: "jet", label: "Jet privado" },
@@ -29,8 +42,13 @@ const messages: Record<Field, string> = {
   vehicle: "El vehículo admite hasta 120 caracteres.",
   location: "La ubicación admite hasta 120 caracteres.",
   capacity: "Escribe un número entero de personas, de 1 a 500.",
+  price:
+    "Escribe un precio en euros de 0 o más, con dos decimales como máximo (por ejemplo, 1200 o 1200,50).",
+  serviceAt: "Escribe una fecha y una hora válidas.",
   description: "La descripción admite hasta 2000 caracteres.",
 };
+
+const pastServiceAt = "Esa fecha y hora ya han pasado: elige una fecha de servicio futura.";
 
 const fieldByError: Record<string, Field> = {
   invalid_title: "title",
@@ -38,6 +56,8 @@ const fieldByError: Record<string, Field> = {
   invalid_vehicle: "vehicle",
   invalid_location: "location",
   invalid_capacity: "capacity",
+  invalid_price: "price",
+  invalid_service_at: "serviceAt",
   invalid_description: "description",
 };
 
@@ -52,6 +72,9 @@ function validate(values: Fields) {
   if (capacity && !(/^\d+$/.test(capacity) && Number(capacity) >= 1 && Number(capacity) <= 500)) {
     errors.capacity = messages.capacity;
   }
+  if (values.price.trim() && parsePrice(values.price) === null) errors.price = messages.price;
+  // Mismo formato y zona horaria en los dos lados: se pueden comparar como texto.
+  if (values.serviceAt && values.serviceAt <= nowInMadrid()) errors.serviceAt = pastServiceAt;
   return errors;
 }
 
@@ -63,6 +86,11 @@ function initialValues(draft?: Draft): Fields {
     location: draft?.location ?? "",
     capacity:
       draft?.capacity === null || draft?.capacity === undefined ? "" : String(draft.capacity),
+    price:
+      draft?.price === null || draft?.price === undefined
+        ? ""
+        : String(draft.price).replace(".", ","),
+    serviceAt: draft?.serviceAt ? toMadridLocal(new Date(draft.serviceAt)) : "",
     description: draft?.description ?? "",
   };
 }
@@ -76,6 +104,8 @@ function toJson(values: Fields) {
     vehicle: text(values.vehicle),
     location: text(values.location),
     capacity: values.capacity.trim() ? Number(values.capacity) : undefined,
+    price: values.price.trim() ? (parsePrice(values.price) ?? undefined) : undefined,
+    serviceAt: values.serviceAt || undefined,
     description: text(values.description),
   };
 }
@@ -133,6 +163,7 @@ export function DraftForm({
       const status: number = res.status;
       if (status === 400) {
         const { error } = await res.json();
+        if (error === "service_at_in_past") return showErrors({ serviceAt: pastServiceAt });
         const field = fieldByError[error];
         if (field) return showErrors({ [field]: messages[field] });
       }
@@ -206,6 +237,25 @@ export function DraftForm({
         value={values.capacity}
         onChange={change("capacity")}
         error={errors.capacity}
+      />
+      <TextInput
+        id="draft-price"
+        label="Precio (EUR)"
+        inputMode="decimal"
+        hint="Precio de la experiencia completa, no por persona."
+        value={values.price}
+        onChange={change("price")}
+        error={errors.price}
+      />
+      <TextInput
+        id="draft-serviceAt"
+        label="Fecha y hora de servicio"
+        type="datetime-local"
+        hint="En hora de Madrid. Tiene que ser una fecha futura."
+        min={nowInMadrid()}
+        value={values.serviceAt}
+        onChange={change("serviceAt")}
+        error={errors.serviceAt}
       />
       <TextArea
         id="draft-description"
