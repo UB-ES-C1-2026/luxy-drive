@@ -28,6 +28,7 @@ import {
 } from "@luxydrive/ui";
 import { createFileRoute, createLink, Link, useRouter } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { AccountNav } from "../account-nav";
 import { client } from "../api";
 import { splitPrice } from "../price";
 
@@ -248,6 +249,7 @@ function DetailPage({ backLink = false, children }: { backLink?: boolean; childr
             <Logo />
           </Link>
         }
+        actions={<AccountNav />}
       />
       <main>
         <Container size="narrow">

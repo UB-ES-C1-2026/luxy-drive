@@ -22,9 +22,11 @@ import {
   Text,
   TextInput,
   TopNav,
+  TopNavLink,
 } from "@luxydrive/ui";
 import { createFileRoute, createLink, Link, useRouter } from "@tanstack/react-router";
 import { type FormEvent, type ReactNode, useState } from "react";
+import { AccountNav } from "../account-nav";
 import { client } from "../api";
 
 const categories = ["jet", "yacht", "camper"] as const satisfies readonly ListingCategory[];
@@ -72,7 +74,7 @@ export const Route = createFileRoute("/experiencias/")({
 });
 
 const CatalogButton = createLink(ButtonLink);
-const OffersButton = createLink(ButtonLink);
+const OffersLink = createLink(TopNavLink);
 
 const categoryLabel: Record<ListingCategory, string> = {
   jet: "Jet privado",
@@ -363,10 +365,13 @@ function CatalogPage({ subtitle, children }: { subtitle?: string; children: Reac
         }
         center={<CategoryFilter />}
         actions={
-          <OffersButton to="/ofertas" variant="secondary" size="sm" className="mb-3 md:mb-0">
-            <Sparkles aria-hidden className="size-4" />
-            Ver ofertas
-          </OffersButton>
+          <>
+            <OffersLink to="/ofertas" className="mb-3 md:mb-0">
+              <Sparkles aria-hidden className="size-4" />
+              Ver ofertas
+            </OffersLink>
+            <AccountNav />
+          </>
         }
       />
       <main>

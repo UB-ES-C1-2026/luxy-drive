@@ -20,6 +20,7 @@ import {
 } from "@luxydrive/ui";
 import { createFileRoute, createLink, Link, useRouter } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { AccountNav } from "../account-nav";
 import { client } from "../api";
 
 export const Route = createFileRoute("/ofertas")({
@@ -161,6 +162,7 @@ function OffersPage({ subtitle, children }: { subtitle?: string; children: React
             <Logo />
           </Link>
         }
+        actions={<AccountNav />}
       />
       <main>
         <Container size="wide">
