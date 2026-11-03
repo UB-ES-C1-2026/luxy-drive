@@ -37,8 +37,8 @@ function Signup() {
               }}
             />
             <Text variant="body-sm" tone="muted">
-              ¿Ya tienes cuenta? <PageLink to="/acceso">Inicia sesión</PageLink> ·{" "}
-              <PageLink to="/experiencias">Ver experiencias</PageLink>
+              ¿Ya tienes cuenta? <PageLink to="/acceso">Inicia sesión</PageLink> · ¿Ofreces
+              experiencias? <PageLink to="/proveedor/registro">Regístrate como proveedor</PageLink>
             </Text>
           </Section>
         </Container>

@@ -33,7 +33,13 @@ function validate(values: Fields) {
 }
 
 /** Formulario de registro: nombre, email y contraseña. Al crear la cuenta, la sesión ya está iniciada. */
-export function SignupForm({ onSignedUp }: { onSignedUp: (user: SessionUser) => Promise<void> }) {
+export function SignupForm({
+  accountType = "client",
+  onSignedUp,
+}: {
+  accountType?: SessionUser["role"];
+  onSignedUp: (user: SessionUser) => Promise<void>;
+}) {
   const [values, setValues] = useState<Fields>({ name: "", email: "", password: "" });
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [failed, setFailed] = useState(false);
@@ -58,9 +64,16 @@ export function SignupForm({ onSignedUp }: { onSignedUp: (user: SessionUser) => 
 
     setSaving(true);
     try {
-      const res = await client.api.auth.signup.$post({
-        json: { name: values.name.trim(), email: values.email.trim(), password: values.password },
-      });
+      const json = {
+        name: values.name.trim(),
+        email: values.email.trim(),
+        password: values.password,
+      };
+      // El rol lo decide el endpoint, nunca el cuerpo de la petición.
+      const res =
+        accountType === "provider"
+          ? await client.api.auth.signup.provider.$post({ json })
+          : await client.api.auth.signup.$post({ json });
       if (res.status === 201) return await onSignedUp(await res.json());
       if (res.status === 409) return showErrors({ email: messages.emailExists });
       if (res.status === 400) {

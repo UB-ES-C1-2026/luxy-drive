@@ -68,7 +68,11 @@ function Account() {
       </div>
       <Text tone="body">Tu sesión está iniciada. Ya puedes explorar y reservar experiencias.</Text>
       <div className="flex flex-wrap gap-3">
-        <PageButton to="/experiencias">Ver experiencias</PageButton>
+        {user.role === "provider" ? (
+          <PageButton to="/proveedor">Ir a la zona de proveedor</PageButton>
+        ) : (
+          <PageButton to="/experiencias">Ver experiencias</PageButton>
+        )}
         <Button variant="secondary" onClick={signOut} disabled={leaving}>
           {leaving ? "Cerrando sesión…" : "Cerrar sesión"}
         </Button>
