@@ -7,7 +7,7 @@ export const Route = createFileRoute("/registro")({
   component: Signup,
 });
 
-const CatalogLink = createLink(TextLink);
+const PageLink = createLink(TextLink);
 
 function Signup() {
   const navigate = useNavigate();
@@ -37,7 +37,8 @@ function Signup() {
               }}
             />
             <Text variant="body-sm" tone="muted">
-              ¿Solo quieres mirar? <CatalogLink to="/experiencias">Ver experiencias</CatalogLink>
+              ¿Ya tienes cuenta? <PageLink to="/acceso">Inicia sesión</PageLink> ·{" "}
+              <PageLink to="/experiencias">Ver experiencias</PageLink>
             </Text>
           </Section>
         </Container>
