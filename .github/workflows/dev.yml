@@ -16,10 +16,6 @@ permissions:
   contents: write
   pull-requests: write
 
-concurrency:
-  group: dev
-  cancel-in-progress: true
-
 jobs:
   rebuild-and-deploy:
     # Un merge a staging ya lanza el evento push; no hace falta repetirlo por el "closed".
@@ -27,6 +23,10 @@ jobs:
       github.event_name != 'pull_request' ||
       github.event.action != 'closed' ||
       github.event.pull_request.merged == false
+    # A nivel de job (no de workflow): así una ejecución saltada no cancela la que sí construye.
+    concurrency:
+      group: dev
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     environment:
       name: dev
