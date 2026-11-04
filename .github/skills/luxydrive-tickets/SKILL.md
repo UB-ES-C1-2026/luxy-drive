@@ -36,7 +36,11 @@ El backlog incluye todo el trabajo que le cuesta tiempo al equipo, no solo histo
 - **Tareas:** cada una toma el código de su elemento más una letra: `US-001.a`, `US-001.b`, `SP-001.a`…
 - **Tamaño de una historia:** debe poder completarse en un sprint, con unos 3-4 días de trabajo en total hasta "hecho". Si no cabe, divídela.
 - **Una issue por tarea.**
-- **El mismo código en todas partes:** tarjeta de Trello (si es una historia), issue, rama (`feature/<código>-slug`), PR, Excel de carga de trabajo y demo.
+- **Una historia = una rama = una PR contra `staging`.** Usa `feature/US-006-registro-cliente` o `feature/JS-001-ofertas`: el código de la historia, sin sufijo de tarea. Las issues mantienen sus códigos de tarea (`US-006.a`, `.b`, `.c`). Sus responsables colaboran en la misma rama con commits separados, sin force-push sobre trabajo ajeno.
+- **PR compartida:** abre un borrador mientras se completa la historia. Antes de integrar, verifica todas sus tareas y añade un `Closes #n` por cada issue resuelta. No cierres una tarea todavía incompleta.
+- **Elementos sin historia:** usa su código propio, por ejemplo `chore/SP-002-auth-decisions`, `chore/TR-003-story-branches` o `fix/BUG-xxx-slug`; también tienen issue y PR contra `staging`.
+- **Transición:** las PRs ya abiertas continúan su revisión actual, sin renombrarlas ni agruparlas retroactivamente. El trabajo nuevo reutiliza la rama de su historia si existe, coordinándose con su responsable.
+- **Trazabilidad:** conserva el código de historia y los códigos de sus tareas en Trello (cuando corresponda), GitHub, Excel y demo.
 
 ## Tarjeta de Trello (historia de usuario)
 
