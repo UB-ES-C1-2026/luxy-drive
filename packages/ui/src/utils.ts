@@ -11,10 +11,9 @@ const eur = new Intl.NumberFormat("es-ES", {
   useGrouping: "always",
 });
 
-/** 4200 → "4.200 €"; 1200.5 → "1.200,50 €" (formato es-ES, céntimos solo si los hay). */
+/** 4200 → "4.200 €" (formato es-ES, sin decimales). */
 export function formatPrice(amount: number): string {
-  // Redondear 1200,50 a "1.201 €" no cuadraría con el precio por persona, que va en céntimos.
-  return Number.isInteger(amount) ? eur.format(amount) : eurCents.format(amount);
+  return eur.format(amount);
 }
 
 const eurCents = new Intl.NumberFormat("es-ES", {
