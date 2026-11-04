@@ -19,7 +19,7 @@ Reglas obligatorias para cualquier agente (Claude Code, Codex, Cursor, Copilot�
    pnpm lint && pnpm typecheck && pnpm build && pnpm test
    ```
    Nunca lo fuerces con `any`, `@ts-ignore`, `biome-ignore`, `.skip` ni borrando tests.
-5. **La PR** lleva un título en Conventional Commits (`feat(api): …`) y rellena la [plantilla de PR](.github/pull_request_template.md): ID de la tarea, qué y por qué, cómo probarlo, qué ha generado el agente y el checklist de la Definition of Done. Un humano la revisa antes del merge.
+5. **Toda PR, incluidas las `chore/`, necesita una issue.** Incluye `Closes #n` o `Fixes #n` en el cuerpo, fuera de comentarios y código; `issue-reference` valida la referencia. **La PR** lleva un título en Conventional Commits (`feat(api): …`) y rellena la [plantilla de PR](.github/pull_request_template.md): ID de la tarea, qué y por qué, cómo probarlo, qué ha generado el agente y el checklist de la Definition of Done. Un humano la revisa antes del merge.
 6. **Nunca** hagas push a `staging`, `main` ni `dev`. Tampoco merges, tags, `wrangler deploy` ni comandos con `--remote`. Eso lo hacen las personas y la CI.
 
 ## Front (`apps/web`)

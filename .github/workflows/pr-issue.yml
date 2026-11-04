@@ -1,0 +1,19 @@
+name: PR issue
+
+on:
+  pull_request:
+    branches: [staging, main]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  issue-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test issue reference validation
+        run: node --test scripts/check-pr-issue.test.mjs
+      - name: Require an issue in the PR description
+        run: node scripts/check-pr-issue.mjs
