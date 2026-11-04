@@ -159,7 +159,7 @@ function ExperienceDetail() {
         </ListingPhoto>
 
         <div className="flex flex-col gap-1 md:col-span-2 md:row-start-1">
-          <Heading as="h1" variant="display-lg">
+          <Heading as="h1" variant="display-lg" className="break-words">
             {experience.title}
           </Heading>
           <Text tone="muted">
