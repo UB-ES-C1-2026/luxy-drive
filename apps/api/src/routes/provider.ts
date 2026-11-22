@@ -88,6 +88,9 @@ const REQUIRED_TO_PUBLISH = [
   ["capacity", "capacity"],
 ] as const satisfies readonly (readonly [keyof ListingRow, string])[];
 
+// Text fields a published listing needs; an empty one would leave it incomplete.
+const EDITABLE_TEXT = ["description", "vehicle", "location"] as const;
+
 // Price in cents and service time in Unix seconds, or a 400 telling what to fix.
 function priceAndDate(changes: { price?: number; serviceAt?: string }) {
   const priceCents = changes.price === undefined ? null : Math.round(changes.price * 100);
@@ -224,7 +227,26 @@ export const provider = new Hono<AuthEnv>()
     const { priceCents, serviceAt, past } = priceAndDate(changes);
     if (past) return c.json({ error: "service_at_in_past" } as const, 400);
     try {
-      // Ownership and draft state are part of the WHERE: nothing else can be changed.
+      const existing = await c.env.DB.prepare(
+        "SELECT provider_id, published FROM experiences WHERE id = ?",
+      )
+        .bind(id)
+        .first<Pick<ListingRow, "provider_id" | "published">>();
+      if (!existing) return c.json({ error: "not_found" } as const, 404);
+      if (existing.provider_id !== userId) return c.json({ error: "forbidden" } as const, 403);
+
+      // A published listing can be corrected (US-013), but the catalog and the detail
+      // must never show it with an empty field.
+      if (existing.published === 1) {
+        const emptied = EDITABLE_TEXT.filter((field) => changes[field] === "");
+        if (emptied.length > 0) {
+          return c.json({ error: "missing_fields" as const, fields: emptied }, 400);
+        }
+      }
+
+      // Ownership is part of the WHERE: nothing else can be changed. A new service date
+      // also moves the end of the offer: a standard offer lasts until the service starts,
+      // and a special one can never outlast it.
       const row = await c.env.DB.prepare(
         `UPDATE experiences
          SET title = COALESCE(?, title),
@@ -234,8 +256,13 @@ export const provider = new Hono<AuthEnv>()
              location = COALESCE(?, location),
              capacity = COALESCE(?, capacity),
              price_cents = COALESCE(?, price_cents),
-             service_at = COALESCE(?, service_at)
-         WHERE id = ? AND provider_id = ? AND published = 0
+             service_at = COALESCE(?, service_at),
+             offer_expires_at = CASE
+               WHEN published = 0 OR ? IS NULL THEN offer_expires_at
+               WHEN offer_type = 'standard' THEN ?
+               ELSE MIN(offer_expires_at, ?)
+             END
+         WHERE id = ? AND provider_id = ?
          RETURNING ${LISTING_COLUMNS}`,
       )
         .bind(
@@ -247,20 +274,15 @@ export const provider = new Hono<AuthEnv>()
           changes.capacity ?? null,
           priceCents,
           serviceAt,
+          serviceAt,
+          serviceAt,
+          serviceAt,
           id,
           userId,
         )
         .first<ListingRow>();
-      if (row) return c.json(toListing(row), 200);
-
-      const existing = await c.env.DB.prepare(
-        "SELECT provider_id, published FROM experiences WHERE id = ?",
-      )
-        .bind(id)
-        .first<Pick<ListingRow, "provider_id" | "published">>();
-      if (!existing) return c.json({ error: "not_found" } as const, 404);
-      if (existing.provider_id !== userId) return c.json({ error: "forbidden" } as const, 403);
-      return c.json({ error: "already_published" } as const, 409);
+      if (!row) return c.json({ error: "not_found" } as const, 404);
+      return c.json(toListing(row), 200);
     } catch {
       return c.json({ error: "internal_error" } as const, 500);
     }
