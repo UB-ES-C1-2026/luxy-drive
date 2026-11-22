@@ -1,0 +1,65 @@
+name: Seed staging
+
+# Carga los datos de demo en staging (TR-005): las experiencias de apps/api/seed/dev.sql y un
+# proveedor de demo dueño de algunos anuncios. Se puede repetir sin duplicar datos.
+# Solo staging: el entorno está fijado aquí y no se puede elegir, así que producción nunca
+# recibe datos de demo.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Escribe "seed-staging" para confirmar'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    if: inputs.confirm == 'seed-staging'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.luxydrive.workers.dev
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      STAGING_URL: https://staging.luxydrive.workers.dev
+      DEMO_PROVIDER_EMAIL: proveedor.demo@luxydrive.test
+      DEMO_PROVIDER_PASSWORD: ${{ secrets.DEMO_PROVIDER_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: staging
+      - uses: ./.github/actions/setup
+
+      - name: Experiencias de demo
+        working-directory: apps/api
+        run: pnpm exec wrangler d1 execute DB --remote --env staging --file seed/dev.sql
+
+      - name: Cuenta del proveedor de demo
+        run: |
+          set -euo pipefail
+          if [ -z "$DEMO_PROVIDER_PASSWORD" ]; then
+            echo "::error::Falta el secret DEMO_PROVIDER_PASSWORD en el entorno staging."
+            exit 1
+          fi
+          body=$(jq -n --arg email "$DEMO_PROVIDER_EMAIL" --arg password "$DEMO_PROVIDER_PASSWORD" \
+            '{name: "Proveedor Demo", email: $email, password: $password}')
+          status=$(curl -sS -o response.json -w '%{http_code}' \
+            -X POST "$STAGING_URL/api/auth/signup/provider" \
+            -H 'Content-Type: application/json' -H "Origin: $STAGING_URL" \
+            --data "$body")
+          case "$status" in
+            201) echo "Proveedor de demo creado." ;;
+            409) echo "El proveedor de demo ya existía." ;;
+            *) echo "::error::Registro del proveedor de demo: HTTP $status"; cat response.json; exit 1 ;;
+          esac
+
+      - name: Perfil y anuncios del proveedor de demo
+        working-directory: apps/api
+        run: pnpm exec wrangler d1 execute DB --remote --env staging --file seed/staging-provider.sql
