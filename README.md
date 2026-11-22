@@ -419,6 +419,37 @@ catálogo y el detalle: `description`, `category`, `vehicle`, `location` y `capa
 `fields` los lista todos, con el precio y la fecha primero. Si no se publica, el anuncio
 sigue siendo un borrador oculto.
 
+### Ofertas especiales de un anuncio propio (US-016.b)
+
+Un proveedor rebaja un anuncio publicado propio con una oferta flash (`last_minute`) o
+empty-leg, que aparece en `GET /api/offers` (JS-001) con su precio, el precio de antes y su
+vigencia. Un anuncio tiene una sola oferta a la vez.
+
+`POST /api/provider/experiences/:id/offer` con
+`{ "type": "last_minute" | "empty_leg", "price": 650.5, "until": "2030-06-14T20:00" }`.
+`price` es el precio rebajado en EUR por la experiencia completa y `until`, el fin de la
+oferta en hora de Madrid (formato de `<input type="datetime-local">`). Responde `201` con
+`{ id, offerType, price, originalPrice, currency, priceUnit, offerExpiresAt }`.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Precio igual o mayor que el normal | `400` | `{ "error": "price_not_lower" }` |
+| `until` ya ha pasado | `400` | `{ "error": "until_in_past" }` |
+| `until` después de la fecha de servicio | `400` | `{ "error": "until_after_service" }` |
+| Campo no válido | `400` | `invalid_offer_type`, `invalid_price` o `invalid_until` |
+| Ya hay una oferta especial en curso | `409` | `{ "error": "offer_active" }` (no quedan dos precios) |
+| Borrador, anuncio retirado o servicio pasado | `409` | `{ "error": "not_available" }` |
+| Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` |
+
+`DELETE /api/provider/experiences/:id/offer` termina la oferta especial y devuelve el
+anuncio a su precio normal hasta la fecha de servicio (`200` con la oferta `standard`).
+Sirve también para una oferta ya caducada: al caducar, el anuncio deja de estar disponible
+(definición de US-001) hasta que se termina la oferta o se lanza otra. Sin oferta especial
+responde `409 no_active_offer`.
+
+En la base de datos se reutilizan las columnas de JS-001: `offer_type`, `price_cents`
+(precio rebajado), `original_price_cents` (precio normal) y `offer_expires_at`.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
