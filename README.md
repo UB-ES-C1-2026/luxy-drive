@@ -125,6 +125,7 @@ Una tarea solo pasa a Done cuando cumple todo esto. La [plantilla de PR](.github
 - La CI aplica las migraciones pendientes antes de cada despliegue.
 - **Nunca edites una migración ya mergeada**: crea una nueva con `pnpm db:new`.
 - En dev las migraciones de PRs se acumulan (aunque la PR se cierre). Si dev queda inconsistente: Actions → **Reset dev DB** → escribe `reset-dev`. Borra las tablas de dev, reaplica las migraciones y carga `apps/api/seed/dev.sql` si existe.
+- **Datos de demo en staging (TR-005):** Actions → **Seed staging** → escribe `seed-staging`. Carga las experiencias de `apps/api/seed/dev.sql` (sustituye las experiencias de staging por las de demo), registra el proveedor de demo `proveedor.demo@luxydrive.test` por la API y le asigna dos anuncios de cada categoría con `apps/api/seed/staging-provider.sql`. Se puede repetir sin duplicar datos. La contraseña del proveedor está en el secret `DEMO_PROVIDER_PASSWORD` del entorno `staging` (pídesela a DevOps). Producción nunca recibe datos de demo: el workflow solo apunta a staging.
 
 ### Modelo mínimo de experiencias (SP-001.a)
 
@@ -429,6 +430,8 @@ Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudfl
   32 bytes y distinto en cada entorno (SP-002). Sin él, registro y login responden `500`. Lo
   configura DevOps con `wrangler secret put AUTH_PEPPER --env <entorno>`; en local va en
   `apps/api/.dev.vars` (`AUTH_PEPPER=...`).
+- Secret `DEMO_PROVIDER_PASSWORD` en el entorno `staging` de GitHub: contraseña del proveedor de demo
+  (mínimo 8 caracteres). Solo lo usa el workflow **Seed staging**.
 - Configuración de los tres entornos: `apps/api/wrangler.jsonc`.
 
 | Workflow | Disparador |
@@ -440,6 +443,7 @@ Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudfl
 | `main-guard.yml` | PR contra `main` |
 | `back-merge.yml` | push a `main` |
 | `reset-dev-db.yml` | manual |
+| `seed-staging.yml` | manual |
 
 ## SP-002: autenticación y roles (Sprint 1)
 
