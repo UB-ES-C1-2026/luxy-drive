@@ -78,6 +78,11 @@ const sendFailed: Problem = {
   body: "Comprueba tu conexión e inténtalo de nuevo. No hemos borrado lo que has escrito.",
 };
 
+const offerActive: Problem = {
+  title: "Ya hay una oferta en curso en este anuncio",
+  body: "Solo puede haber un precio activo a la vez, así que no hemos creado la nueva. Termina la oferta actual y vuelve a lanzarla.",
+};
+
 function OfferPage() {
   const data = Route.useLoaderData();
   const user = useSessionUser();
@@ -120,7 +125,13 @@ function OfferPage() {
       ) : (
         <>
           {current && <CurrentOffer offer={current} />}
-          <OfferForm id={listing.id} price={listing.price} serviceAt={listing.serviceAt} />
+          {/* Durante una oferta, `listing.price` es el rebajado; la API compara con el normal. */}
+          <OfferForm
+            id={listing.id}
+            normalPrice={current?.originalPrice ?? listing.price}
+            serviceAt={listing.serviceAt}
+            running={current !== undefined}
+          />
         </>
       )}
     </ProviderPage>
@@ -182,7 +193,18 @@ function CurrentOffer({
   );
 }
 
-function OfferForm({ id, price, serviceAt }: { id: number; price: number; serviceAt: string }) {
+function OfferForm({
+  id,
+  normalPrice,
+  serviceAt,
+  running,
+}: {
+  id: number;
+  normalPrice: number;
+  serviceAt: string;
+  /** Hay una oferta especial en curso. */
+  running: boolean;
+}) {
   const router = useRouter();
   const [type, setType] = useState("");
   const [newPrice, setNewPrice] = useState("");
@@ -195,7 +217,7 @@ function OfferForm({ id, price, serviceAt }: { id: number; price: number; servic
 
   const messages: Record<Field, string> = {
     type: "Elige si es una oferta flash o un empty leg.",
-    price: `Escribe un precio en euros menor que el actual (${formatPrice(price)}), con dos decimales como máximo.`,
+    price: `Escribe un precio en euros menor que el normal (${formatPrice(normalPrice)}), con dos decimales como máximo.`,
     until: `Elige una fecha y hora futura, como tarde la del servicio (${expiryDate.format(new Date(serviceAt))}).`,
   };
 
@@ -204,7 +226,7 @@ function OfferForm({ id, price, serviceAt }: { id: number; price: number; servic
     const amount = parsePrice(newPrice);
     const found: Partial<Record<Field, string>> = {};
     if (!type) found.type = messages.type;
-    if (amount === null || amount >= price) found.price = messages.price;
+    if (amount === null || amount >= normalPrice) found.price = messages.price;
     if (!until || until <= nowInMadrid() || until > serviceLocal) found.until = messages.until;
     return { amount, found };
   };
@@ -246,10 +268,7 @@ function OfferForm({ id, price, serviceAt }: { id: number; price: number; servic
         const { error } = await res.json();
         if (error === "offer_active") {
           await router.invalidate();
-          return setProblem({
-            title: "Ya hay una oferta en curso en este anuncio",
-            body: "Solo puede haber un precio activo a la vez, así que no hemos creado la nueva. Termina la oferta actual y vuelve a lanzarla.",
-          });
+          return setProblem(offerActive);
         }
         return setProblem({
           title: "Este anuncio ya no admite ofertas",
@@ -264,9 +283,12 @@ function OfferForm({ id, price, serviceAt }: { id: number; price: number; servic
     }
   };
 
+  // Al terminar la oferta en curso, los avisos sobre ella ya no aplican.
+  const shownProblem = problem === offerActive && !running ? null : problem;
+
   return (
     <form noValidate onSubmit={submit} className="flex max-w-2xl flex-col gap-6">
-      {done && (
+      {done && running && (
         <Notice
           icon={<CircleCheck />}
           title="Oferta publicada"
@@ -279,9 +301,9 @@ function OfferForm({ id, price, serviceAt }: { id: number; price: number; servic
           Ya aparece en la sección de ofertas con su precio y su vigencia.
         </Notice>
       )}
-      {problem && (
-        <Notice tone="error" title={problem.title}>
-          {problem.body}
+      {shownProblem && (
+        <Notice tone="error" title={shownProblem.title}>
+          {shownProblem.body}
         </Notice>
       )}
       <div className="flex flex-col gap-2">
@@ -307,7 +329,7 @@ function OfferForm({ id, price, serviceAt }: { id: number; price: number; servic
       <TextInput
         id="offer-price"
         label="Precio rebajado, por la experiencia completa"
-        hint={`Ahora cuesta ${formatPrice(price)}.`}
+        hint={`Precio normal: ${formatPrice(normalPrice)}.`}
         inputMode="decimal"
         placeholder="Por ejemplo, 900"
         value={newPrice}
