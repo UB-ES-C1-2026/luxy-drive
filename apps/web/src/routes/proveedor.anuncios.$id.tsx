@@ -19,9 +19,13 @@ import { useSessionUser } from "../session";
 
 export const Route = createFileRoute("/proveedor/anuncios/$id")({
   // Sin `paso` se ve el resumen del anuncio; con `paso`, esa pregunta.
-  validateSearch: (search: Record<string, unknown>): { paso?: number } => {
+  // `guardado` avisa en el resumen de que se acaba de corregir un anuncio publicado.
+  validateSearch: (search: Record<string, unknown>): { paso?: number; guardado?: true } => {
     const step = Number(search.paso);
-    return { paso: Number.isInteger(step) && step >= 1 && step <= steps.length ? step : undefined };
+    return {
+      paso: Number.isInteger(step) && step >= 1 && step <= steps.length ? step : undefined,
+      guardado: search.guardado === true ? true : undefined,
+    };
   },
   beforeLoad: requireSession,
   loader: async ({ params }) => {
@@ -43,7 +47,7 @@ const EditLink = createLink(TextLink);
 
 function DraftPage() {
   const data = Route.useLoaderData();
-  const { paso } = Route.useSearch();
+  const { paso, guardado } = Route.useSearch();
   const user = useSessionUser();
   const router = useRouter();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -69,6 +73,25 @@ function DraftPage() {
 
   const { draft } = data;
 
+  if (paso !== undefined && draft.status === "published") {
+    const backToSummary = async (saved: boolean) => {
+      await navigate({ search: { guardado: saved || undefined } });
+      await router.invalidate();
+    };
+    return (
+      <ProviderPage>
+        <DraftStep
+          key={`${draft.id}-${paso}`}
+          draft={draft}
+          index={paso - 1}
+          published
+          onSaved={() => backToSummary(true)}
+          onBack={() => backToSummary(false)}
+        />
+      </ProviderPage>
+    );
+  }
+
   if (paso !== undefined && draft.status === "draft") {
     const goTo = async (step: number | undefined) => {
       await navigate({ search: { paso: step } });
@@ -93,12 +116,12 @@ function DraftPage() {
     );
   }
 
-  return <DraftSummary draft={draft} />;
+  return <DraftSummary draft={draft} saved={guardado === true} />;
 }
 
 type PublishProblem = { title: string; body: string; fields: string[] };
 
-function DraftSummary({ draft }: { draft: Draft }) {
+function DraftSummary({ draft, saved }: { draft: Draft; saved: boolean }) {
   const router = useRouter();
   const [problem, setProblem] = useState<PublishProblem | null>(null);
   const [publishing, setPublishing] = useState(false);
@@ -179,10 +202,18 @@ function DraftSummary({ draft }: { draft: Draft }) {
       {!isDraft && (
         <Notice
           icon={<CircleCheck />}
-          title={justPublished ? "Anuncio publicado" : "Este anuncio está publicado"}
+          title={
+            justPublished
+              ? "Anuncio publicado"
+              : saved
+                ? "Cambios guardados"
+                : "Este anuncio está publicado"
+          }
           className="max-w-2xl"
         >
-          Los visitantes ya pueden encontrarlo en el catálogo a su precio normal.
+          {saved
+            ? "El catálogo y el detalle ya muestran los datos nuevos."
+            : "Los visitantes ya pueden encontrarlo en el catálogo. Si corriges un dato, el cambio se ve al momento."}
         </Notice>
       )}
       <dl className="flex max-w-2xl flex-col divide-y divide-hairline border-y border-hairline">
@@ -208,15 +239,13 @@ function DraftSummary({ draft }: { draft: Draft }) {
                   )}
                 </dd>
               </div>
-              {isDraft && (
-                <EditLink
-                  from={Route.fullPath}
-                  search={{ paso: index + 1 }}
-                  aria-label={`Editar: ${step.label}`}
-                >
-                  {missing ? "Completar" : "Editar"}
-                </EditLink>
-              )}
+              <EditLink
+                from={Route.fullPath}
+                search={{ paso: index + 1 }}
+                aria-label={`Editar: ${step.label}`}
+              >
+                {missing ? "Completar" : "Editar"}
+              </EditLink>
             </div>
           );
         })}
