@@ -239,13 +239,16 @@ function DraftSummary({ draft, saved }: { draft: Draft; saved: boolean }) {
                   )}
                 </dd>
               </div>
-              <EditLink
-                from={Route.fullPath}
-                search={{ paso: index + 1 }}
-                aria-label={`Editar: ${step.label}`}
-              >
-                {missing ? "Completar" : "Editar"}
-              </EditLink>
+              {/* Un anuncio retirado (US-014) ya no se corrige. */}
+              {(isDraft || draft.status === "published") && (
+                <EditLink
+                  from={Route.fullPath}
+                  search={{ paso: index + 1 }}
+                  aria-label={`Editar: ${step.label}`}
+                >
+                  {missing ? "Completar" : "Editar"}
+                </EditLink>
+              )}
             </div>
           );
         })}

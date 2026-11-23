@@ -237,8 +237,10 @@ export function DraftStep({
       document.getElementById(inputId)?.focus();
       return;
     }
-    // Sin cambios no hace falta guardar.
-    if (draft && next.trim() === step.read(draft).trim()) return onSaved(draft, exit);
+    // Sin cambios no hace falta guardar; en un publicado tampoco hay nada que avisar.
+    if (draft && next.trim() === step.read(draft).trim()) {
+      return published ? onBack?.() : onSaved(draft, exit);
+    }
 
     setSaving(true);
     try {
@@ -283,6 +285,8 @@ export function DraftStep({
 
   const empty = !value.trim();
   const last = index === steps.length - 1;
+  // La ayuda del título habla del borrador: no aplica al corregir un anuncio publicado.
+  const help = published && step.field === "title" ? undefined : step.help;
 
   return (
     <form noValidate onSubmit={submit} className="flex max-w-2xl flex-col gap-8">
@@ -291,7 +295,7 @@ export function DraftStep({
         <Heading as="h1" variant="display-xl">
           {step.question}
         </Heading>
-        {step.help && <Text tone="muted">{step.help}</Text>}
+        {help && <Text tone="muted">{help}</Text>}
       </div>
       {problem && (
         <Notice tone="error" title={problem.title}>
