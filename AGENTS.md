@@ -27,6 +27,7 @@ Reglas obligatorias para cualquier agente (Claude Code, Codex, Cursor, Copilot�
 - Usa **solo componentes de `@luxydrive/ui`**. En `apps/web`, Tailwind sirve solo para layout (`flex`, `grid`, `gap`, márgenes). Colores, tipografía, bordes y sombras van dentro de `packages/ui`.
 - **Si falta un componente**, créalo en `packages/ui/src/<nombre>.tsx`, expórtalo en `index.ts` y usa los tokens de `DESIGN.md`. Nada de colores hex sueltos.
 - **Tipografía: Inter**, la única. Usa solo imágenes propias o con licencia, y nunca marcas ni logos de terceros.
+- **Textos:** escríbelos como dice la sección "UI Text" de `DESIGN.md` (tono, botones, errores, estados vacíos, precios y fechas).
 - **Datos:** llama a la API solo con `client` (`apps/web/src/api.ts`), preferiblemente en el `loader` de la ruta. Nunca uses `fetch` a mano.
 - **Rutas:** una ruta = un archivo en `src/routes/`. No edites `routeTree.gen.ts`, que es generado.
 - **Accesibilidad:** usa elementos nativos (`button`, `a`, `label`), deja el foco visible, pon `alt` en las imágenes y diseña para móvil primero.
