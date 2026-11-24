@@ -31,6 +31,7 @@ import type { ReactNode } from "react";
 import { AccountNav } from "../account-nav";
 import { client } from "../api";
 import { splitPrice } from "../price";
+import { RequestReservation } from "../request-reservation";
 
 export const Route = createFileRoute("/experiencias/$id")({
   loader: async ({ params }) => {
@@ -130,7 +131,7 @@ function ExperienceDetail() {
         <EmptyState
           icon={<CircleAlert aria-hidden />}
           title="Esta experiencia ya no está disponible"
-          description="La oferta ha caducado o la fecha de servicio ya ha pasado."
+          description="La oferta ha caducado, la fecha de servicio ya ha pasado o ya la ha reservado otra persona."
           action={<CatalogButton to="/experiencias">Ver experiencias disponibles</CatalogButton>}
         />
       </DetailPage>
@@ -172,7 +173,9 @@ function ExperienceDetail() {
           priceUnit={experience.priceUnit}
           priceDetail={<PerPersonPrice price={experience.price} capacity={experience.capacity} />}
           className="md:sticky md:top-6 md:col-start-2 md:row-span-2 md:row-start-2 md:self-start"
-        />
+        >
+          <RequestReservation experienceId={experience.id} />
+        </BookingCard>
 
         <div className="flex flex-col gap-8 md:col-start-1 md:row-start-3">
           <AmenityList
