@@ -1,17 +1,8 @@
 import { Button, ButtonLink, CircleCheck, Notice } from "@luxydrive/ui";
 import { createLink } from "@tanstack/react-router";
 import { useState } from "react";
-import { client, type JsonEndpoint, type ProposedApi } from "./api";
+import { client } from "./api";
 import { setSessionUser, useSessionUser } from "./session";
-
-// Contrato propuesto para US-018.b (#106).
-declare module "./api" {
-  interface ApiContracts {
-    createReservation: ProposedApi<{
-      "/api/reservations": { $post: JsonEndpoint<{ json: { experienceId: number } }> };
-    }>;
-  }
-}
 
 const PageButton = createLink(ButtonLink);
 
@@ -38,32 +29,25 @@ function ClientRequest({ experienceId }: { experienceId: number }) {
     setState("sending");
     try {
       const res = await client.api.reservations.$post({ json: { experienceId } });
-      if (res.status === 401) {
+      // La sesión la comprueba un middleware: su 401 no aparece en los tipos de la ruta.
+      const status: number = res.status;
+      if (status === 401) {
         setSessionUser(null);
         return;
       }
-      if (res.status === 410) {
+      if (res.status === 201) {
+        setState((await res.json()).status === "pending" ? "pending" : "error");
+        return;
+      }
+      if (res.status === 409) {
+        // Ya tenía una solicitud pendiente de esta experiencia.
+        setState("pending");
+        return;
+      }
+      // 404: borrador o inexistente. 410: caducada, retirada o ya reservada por otra persona.
+      if (res.status === 404 || res.status === 410) {
         setState("unavailable");
         return;
-      }
-      if (res.status === 404) {
-        // Un borrador no aparece en el detalle público. Distinguirlo de una ruta de API ausente.
-        const detail = await client.api.experiences[":id"].$get({
-          param: { id: String(experienceId) },
-        });
-        setState(detail.status === 404 || detail.status === 410 ? "unavailable" : "error");
-        return;
-      }
-      const body = await res.json();
-      if (body && typeof body === "object") {
-        if (res.ok && "status" in body && body.status === "pending") {
-          setState("pending");
-          return;
-        }
-        if (!res.ok && "error" in body && body.error === "not_available") {
-          setState("unavailable");
-          return;
-        }
       }
       setState("error");
     } catch {
@@ -81,7 +65,7 @@ function ClientRequest({ experienceId }: { experienceId: number }) {
   if (state === "unavailable") {
     return (
       <Notice title="Esta experiencia ya no está disponible">
-        La oferta ha caducado o el anuncio se ha retirado.
+        La oferta ha caducado, el anuncio se ha retirado o ya la ha reservado otra persona.
       </Notice>
     );
   }
