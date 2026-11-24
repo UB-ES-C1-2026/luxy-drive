@@ -1,7 +1,7 @@
 import { Button, EmptyState, Heading, Notice, Skeleton, Text } from "@luxydrive/ui";
 import { useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { client, type JsonEndpoint, type ProposedApi } from "./api";
+import { client } from "./api";
 import {
   formatReservationDate,
   isReservationSummary,
@@ -9,15 +9,6 @@ import {
   reservationStatusLabel,
 } from "./reservation";
 import { setSessionUser } from "./session";
-
-// Contrato propuesto para US-019.b (#112). La identidad la determina la cookie de sesión.
-declare module "./api" {
-  interface ApiContracts {
-    myReservations: ProposedApi<{
-      "/api/reservations": { $get: JsonEndpoint<Record<string, never>> };
-    }>;
-  }
-}
 
 type LoadState =
   | { status: "loading" }
@@ -39,7 +30,9 @@ export function MyReservations() {
     try {
       const res = await client.api.reservations.$get({}, { init: { signal, cache: "no-store" } });
       if (signal.aborted) return;
-      if (res.status === 401) {
+      // 401 lo pone el middleware de /api/reservations, así que no está en el tipo de la respuesta.
+      const status: number = res.status;
+      if (status === 401) {
         setSessionUser(null);
         await router.invalidate();
         return;
