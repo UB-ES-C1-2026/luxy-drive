@@ -453,6 +453,33 @@ cliente de la sesión, con las reglas de SP-003 (#93). Desde el frontend:
 reservada sale del catálogo y de las ofertas, y su detalle responde `410`. La base de datos
 impide dos reservas confirmadas para la misma experiencia (índice único parcial).
 
+### Resolver solicitudes de reserva (US-020.b)
+
+Rutas de proveedor, con las reglas de SP-003 (#93):
+
+- `GET /api/provider/reservations` devuelve las solicitudes de **sus** anuncios, de la más
+  nueva a la más antigua, con el mismo objeto que US-018.b más `clientName`.
+- `PATCH /api/provider/reservations/:id` con `{ "status": "confirmed" }` o
+  `{ "status": "rejected" }` resuelve una solicitud pendiente y devuelve la solicitud
+  actualizada. Confirmar rechaza en la misma transacción las demás pendientes de esa
+  experiencia, que deja de estar disponible. El cliente ve el estado nuevo en sus reservas.
+
+Desde el frontend: `client.api.provider.reservations.$get()` y
+`client.api.provider.reservations[":id"].$patch({ param: { id }, json: { status } })`.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Sin sesión | `401` | `{ "error": "unauthorized" }` |
+| Sesión de cliente, u `Origin` distinto | `403` | `{ "error": "forbidden" }` / `{ "error": "invalid_origin" }` |
+| Solicitud sobre el anuncio de otro proveedor (no cambia nada) | `403` | `{ "error": "forbidden" }` |
+| `id` no es un entero positivo | `400` | `{ "error": "invalid_id" }` |
+| `status` distinto de `confirmed` o `rejected` | `400` | `{ "error": "invalid_status" }` |
+| La solicitud no existe | `404` | `{ "error": "not_found" }` |
+| Ya no está pendiente (incluido rechazada al confirmar otra) | `409` | `{ "error": "already_resolved" }` |
+| Confirmar cuando la experiencia ya no está disponible | `409` | `{ "error": "not_available" }` |
+
+Rechazar una solicitud pendiente siempre está permitido.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
