@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { AVAILABLE } from "../availability";
 import type { Bindings } from "../env";
 
 type OfferRow = {
@@ -21,8 +22,7 @@ export const offers = new Hono<{ Bindings: Bindings }>().get("/", async (c) => {
       `SELECT id, title, category, location, service_at, price_cents,
               original_price_cents, offer_type, offer_expires_at
        FROM experiences
-       WHERE published = 1 AND offer_active = 1
-         AND offer_expires_at > ? AND service_at > ?
+       WHERE ${AVAILABLE}
          AND offer_type IN ('last_minute', 'empty_leg')
          AND original_price_cents > price_cents
        ORDER BY offer_expires_at, id`,

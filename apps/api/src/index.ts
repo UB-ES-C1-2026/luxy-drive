@@ -4,6 +4,7 @@ import { auth } from "./routes/auth";
 import { experiences } from "./routes/experiences";
 import { offers } from "./routes/offers";
 import { provider } from "./routes/provider";
+import { reservations } from "./routes/reservations";
 
 const app = new Hono<{ Bindings: Bindings }>().basePath("/api");
 
@@ -12,6 +13,7 @@ const routes = app
   .route("/experiences", experiences)
   .route("/offers", offers)
   .route("/provider", provider)
+  .route("/reservations", reservations)
   .get("/health", async (c) => {
     try {
       await c.env.DB.prepare("SELECT 1").first();
