@@ -1,4 +1,4 @@
-import { client, type JsonEndpoint, type ProposedApi } from "./api";
+import { client } from "./api";
 import {
   isReservationSummary,
   type ReservationStatus,
@@ -7,18 +7,6 @@ import {
 
 export type Decision = Exclude<ReservationStatus, "pending">;
 type ProviderReservation = ReservationSummary & { clientName: string };
-
-// Contrato propuesto para US-020.b (#109). El servidor aplica las reglas de SP-003.
-declare module "./api" {
-  interface ApiContracts {
-    providerReservations: ProposedApi<{
-      "/api/provider/reservations": { $get: JsonEndpoint<Record<string, never>> };
-      "/api/provider/reservations/:id": {
-        $patch: JsonEndpoint<{ param: { id: string }; json: { status: Decision } }>;
-      };
-    }>;
-  }
-}
 
 function isProviderReservation(value: unknown): value is ProviderReservation {
   return (
@@ -31,7 +19,9 @@ export async function listPendingRequests(signal: AbortSignal) {
     {},
     { init: { signal, cache: "no-store" } },
   );
-  if (res.status === 401) return { status: "expired" } as const;
+  // La sesión la comprueba un middleware: su 401 no aparece en los tipos de la ruta.
+  const status: number = res.status;
+  if (status === 401) return { status: "expired" } as const;
   if (!res.ok) throw new Error("requests_unavailable");
   const rows = await res.json();
   if (!Array.isArray(rows) || !rows.every(isProviderReservation)) {
@@ -45,7 +35,8 @@ export async function decideRequest(id: number, status: Decision) {
     param: { id: String(id) },
     json: { status },
   });
-  if (res.status === 401) return "expired";
+  const code: number = res.status;
+  if (code === 401) return "expired";
   if (res.status === 409) return "conflict";
   if (!res.ok) throw new Error("decision_unavailable");
   const saved = await res.json();
