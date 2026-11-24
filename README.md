@@ -548,3 +548,79 @@ No añade endpoints ni migraciones por sí sola.
 - Tests de implementación: registro válido/duplicado/campos, credenciales erróneas,
   sesión ausente/vencida/revocada, separación client/provider, propiedad de recursos
   y Origin incorrecto. Las migraciones serán nuevas y compatibles con el despliegue.
+
+## SP-003: estados y reglas de una reserva (Sprint 2)
+
+Decisión de diseño para #93. La implementación corresponde a #106 (solicitar,
+US-018.b), #109 (resolver, US-020.b) y #112 (mis reservas, US-019.b). En Sprint 2 una
+reserva es una **reserva privada completa** (EP-004): un único cliente se queda la
+experiencia entera, sea cual sea su capacidad. Las experiencias compartidas son EP-015.
+
+### Estados y transiciones
+
+| Estado | Significa | Quién llega a él |
+| --- | --- | --- |
+| `pending` | Solicitud enviada, esperando al proveedor | El cliente, al solicitar |
+| `confirmed` | El proveedor la ha aceptado: la experiencia es de ese cliente | El proveedor dueño del anuncio |
+| `rejected` | El proveedor la ha rechazado, o ha confirmado otra | El proveedor dueño del anuncio, o el sistema al confirmar otra |
+
+- Solo se pasa de `pending` a `confirmed` o a `rejected`. `confirmed` y `rejected` son
+  finales en este sprint: anular una reserva es US-026 y el pago es US-021.
+- Resolver una solicitud que ya no está pendiente responde `409 already_resolved`, sin
+  cambiar nada. Así, dos decisiones a la vez nunca se pisan.
+
+### Disponibilidad y competencia entre solicitudes
+
+- Se puede solicitar una experiencia **disponible**: la definición de US-001 (publicada,
+  oferta activa y sin caducar, servicio futuro) y, además, **sin reserva confirmada**.
+  El catálogo, las ofertas y el detalle usan esa misma definición: una experiencia
+  confirmada desaparece del catálogo y su detalle responde `410 not_available`.
+- Varias solicitudes pendientes pueden convivir sobre la misma experiencia: el
+  proveedor elige. Un mismo cliente solo puede tener una pendiente por experiencia
+  (`409 already_requested`). Tras un rechazo puede volver a solicitar mientras siga
+  disponible.
+- Al confirmar una solicitud, en la misma transacción (`DB.batch`) se rechazan las
+  demás pendientes de esa experiencia. Esas solicitudes pasan a `rejected` y su cliente
+  lo ve en sus reservas.
+- **Solo una confirmada por experiencia**: lo garantiza la base de datos con un índice
+  único parcial (`experience_id` donde `status = 'confirmed'`), no solo la API. Si dos
+  confirmaciones compiten, la segunda falla y responde `409`.
+- El proveedor solo puede confirmar mientras la experiencia sigue disponible (si el
+  servicio ya pasó, la oferta caducó o la retiró con US-014, responde
+  `409 not_available`). Rechazar una pendiente siempre está permitido.
+
+### Qué se guarda
+
+Tabla `reservations` (migración nueva):
+
+- `id`, `experience_id` (FK a `experiences`) y `client_id` (FK a `users`), ambas con
+  `ON DELETE CASCADE`.
+- `status`, restringido a `pending`, `confirmed` o `rejected`.
+- `price_cents`: el precio de la experiencia **en el momento de solicitar**. US-013
+  permite corregir un anuncio publicado, y el cliente ha pedido a un precio concreto.
+  La fecha de servicio, en cambio, se lee siempre del anuncio.
+- `created_at` y `decided_at`, en segundos Unix UTC (`decided_at` es `NULL` mientras
+  está pendiente).
+
+### Rutas y protección
+
+| Ruta | Quién | Historia |
+| --- | --- | --- |
+| `POST /api/reservations` con `{ "experienceId": 7 }` | Cliente | US-018.b |
+| `GET /api/reservations` | Cliente: solo las suyas | US-019.b |
+| `GET /api/provider/reservations` | Proveedor: solo las de sus anuncios | US-020.b |
+| `PATCH /api/provider/reservations/:id` con `{ "status": "confirmed" }` o `"rejected"` | Proveedor dueño del anuncio | US-020.b |
+
+- Se aplican las reglas de SP-002: sin sesión `401 unauthorized`; con el rol equivocado
+  `403 forbidden` (un proveedor no puede solicitar, un cliente no puede resolver); las
+  escrituras exigen el mismo `Origin`.
+- La propiedad se comprueba en SQL: `client_id` es siempre el de la sesión, nunca un
+  campo de la petición, y el proveedor se comprueba con `experiences.provider_id`.
+  Resolver una solicitud del anuncio de otro proveedor responde `403 forbidden` y no
+  cambia su estado.
+- Solicitar algo que no existe o que no está publicado responde `404 not_found` (igual
+  que el detalle, para no revelar borradores). Si está publicado pero ya no está
+  disponible, `410 not_available`.
+- Cada solicitud se devuelve con `id`, `experienceId`, `experienceTitle`, `serviceAt`
+  (ISO 8601 UTC), `price`, `currency`, `status` y `createdAt`; al proveedor se le añade
+  `clientName`. Nunca se devuelve el email del cliente.
