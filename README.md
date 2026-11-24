@@ -419,6 +419,40 @@ catálogo y el detalle: `description`, `category`, `vehicle`, `location` y `capa
 `fields` los lista todos, con el precio y la fecha primero. Si no se publica, el anuncio
 sigue siendo un borrador oculto.
 
+### Solicitar una reserva (US-018.b)
+
+`POST /api/reservations` con `{ "experienceId": 7 }` crea una solicitud de reserva del
+cliente de la sesión, con las reglas de SP-003 (#93). Desde el frontend:
+`client.api.reservations.$post({ json: { experienceId } })`. Responde `201` con:
+
+```json
+{
+  "id": 12,
+  "experienceId": 7,
+  "experienceTitle": "Velero en Palma",
+  "serviceAt": "2026-12-05T17:30:00.000Z",
+  "price": 900,
+  "currency": "EUR",
+  "status": "pending",
+  "createdAt": "2026-11-24T19:00:00.000Z"
+}
+```
+
+`price` es el precio en el momento de solicitar; se guarda en `reservations.price_cents`.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Sin sesión | `401` | `{ "error": "unauthorized" }` |
+| Sesión de proveedor, u `Origin` distinto | `403` | `{ "error": "forbidden" }` / `{ "error": "invalid_origin" }` |
+| `experienceId` no es un entero positivo | `400` | `{ "error": "invalid_experience_id" }` |
+| No existe o es un borrador | `404` | `{ "error": "not_found" }` |
+| Publicada pero no disponible (oferta caducada o retirada, servicio pasado o ya reservada) | `410` | `{ "error": "not_available" }` |
+| El cliente ya tiene una solicitud pendiente de esa experiencia | `409` | `{ "error": "already_requested" }` |
+
+"Disponible" es la definición de US-001 más **sin reserva confirmada**: una experiencia
+reservada sale del catálogo y de las ofertas, y su detalle responde `410`. La base de datos
+impide dos reservas confirmadas para la misma experiencia (índice único parcial).
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
