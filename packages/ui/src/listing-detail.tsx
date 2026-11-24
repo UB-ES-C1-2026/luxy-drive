@@ -228,7 +228,7 @@ export type BookingCardProps = {
   originalPrice?: number;
   /** Línea bajo el precio (precio por persona, condiciones). */
   priceDetail?: ReactNode;
-  /** Selectores de fecha, ruta y pasajeros. */
+  /** Contenido bajo el precio: acciones, estado o selectores de la reserva. */
   children?: ReactNode;
   /** Desglose de precio; si hay líneas, se muestra el total. */
   breakdown?: PriceLine[];
@@ -285,6 +285,7 @@ export function BookingCard({
     return (
       <section aria-label="Precio" className={cardClass}>
         {priceLine}
+        {children}
       </section>
     );
   }
