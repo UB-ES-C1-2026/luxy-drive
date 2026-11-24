@@ -1,9 +1,10 @@
 name: Seed staging
 
-# Carga los datos de demo en staging (TR-005): las experiencias de apps/api/seed/dev.sql y un
-# proveedor de demo dueño de algunos anuncios. Se puede repetir sin duplicar datos.
-# Solo staging: el entorno está fijado aquí y no se puede elegir, así que producción nunca
-# recibe datos de demo.
+# Carga los datos de demo en staging (TR-005) con apps/api/seed/staging.sql: las mismas
+# experiencias que dev, todas del proveedor de demo. Solo toca lo que es de ese proveedor
+# (sus anuncios, las reservas hechas sobre ellos y su perfil); el resto de staging no cambia.
+# Se puede repetir. Solo staging: el entorno está fijado aquí, así que producción nunca recibe
+# datos de demo.
 on:
   workflow_dispatch:
     inputs:
@@ -13,9 +14,12 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
+# Grupo propio: compartir el de deploy-staging podría cancelar un deploy en cola.
+# En su lugar, el primer paso espera a que no haya ningún deploy de staging en marcha.
 concurrency:
-  group: deploy-staging
+  group: seed-staging
   cancel-in-progress: false
 
 jobs:
@@ -32,34 +36,61 @@ jobs:
       DEMO_PROVIDER_EMAIL: proveedor.demo@luxydrive.test
       DEMO_PROVIDER_PASSWORD: ${{ secrets.DEMO_PROVIDER_PASSWORD }}
     steps:
+      # Todas las comprobaciones van antes de tocar la base de datos.
+      - name: Comprobar el secret
+        run: |
+          if [ "${#DEMO_PROVIDER_PASSWORD}" -lt 8 ]; then
+            echo "::error::Falta el secret DEMO_PROVIDER_PASSWORD (mínimo 8 caracteres) en el entorno staging."
+            exit 1
+          fi
+
+      - name: Esperar a que no haya un deploy de staging en marcha
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            busy=$(gh run list -R "$GITHUB_REPOSITORY" --workflow deploy-staging.yml --limit 20 \
+              --json status --jq '[.[] | select(.status != "completed")] | length')
+            if [ "$busy" = "0" ]; then exit 0; fi
+            echo "Hay $busy deploy(s) de staging en marcha; espero 20 s..."
+            sleep 20
+          done
+          echo "::error::Sigue habiendo un deploy de staging en marcha después de 10 minutos."
+          exit 1
+
+      - name: Cuenta del proveedor de demo
+        run: |
+          set -euo pipefail
+          body=$(jq -n --arg email "$DEMO_PROVIDER_EMAIL" --arg password "$DEMO_PROVIDER_PASSWORD" \
+            '{name: "Proveedor Demo", email: $email, password: $password}')
+          post() {
+            curl -sS -o response.json -w '%{http_code}' -X POST "$STAGING_URL/api/auth/$1" \
+              -H 'Content-Type: application/json' -H "Origin: $STAGING_URL" --data "$body"
+          }
+          status=$(post signup/provider)
+          case "$status" in
+            201) echo "Proveedor de demo creado." ;;
+            409)
+              # El correo ya existe: solo seguimos si es nuestra cuenta y es de proveedor.
+              status=$(post login)
+              role=$(jq -r '.role // empty' response.json 2>/dev/null || true)
+              if [ "$status" != "200" ] || [ "$role" != "provider" ]; then
+                echo "::error::$DEMO_PROVIDER_EMAIL ya existe en staging pero no es la cuenta de demo (login HTTP $status, rol '${role:-?}'). No se ha tocado nada."
+                exit 1
+              fi
+              echo "El proveedor de demo ya existía y la contraseña del secret es correcta." ;;
+            *)
+              echo "::error::Registro del proveedor de demo: HTTP $status. No se ha tocado nada."
+              cat response.json
+              exit 1 ;;
+          esac
+
       - uses: actions/checkout@v7
         with:
           ref: staging
       - uses: ./.github/actions/setup
 
-      - name: Experiencias de demo
+      - name: Anuncios y perfil del proveedor de demo
         working-directory: apps/api
-        run: pnpm exec wrangler d1 execute DB --remote --env staging --file seed/dev.sql
-
-      - name: Cuenta del proveedor de demo
-        run: |
-          set -euo pipefail
-          if [ -z "$DEMO_PROVIDER_PASSWORD" ]; then
-            echo "::error::Falta el secret DEMO_PROVIDER_PASSWORD en el entorno staging."
-            exit 1
-          fi
-          body=$(jq -n --arg email "$DEMO_PROVIDER_EMAIL" --arg password "$DEMO_PROVIDER_PASSWORD" \
-            '{name: "Proveedor Demo", email: $email, password: $password}')
-          status=$(curl -sS -o response.json -w '%{http_code}' \
-            -X POST "$STAGING_URL/api/auth/signup/provider" \
-            -H 'Content-Type: application/json' -H "Origin: $STAGING_URL" \
-            --data "$body")
-          case "$status" in
-            201) echo "Proveedor de demo creado." ;;
-            409) echo "El proveedor de demo ya existía." ;;
-            *) echo "::error::Registro del proveedor de demo: HTTP $status"; cat response.json; exit 1 ;;
-          esac
-
-      - name: Perfil y anuncios del proveedor de demo
-        working-directory: apps/api
-        run: pnpm exec wrangler d1 execute DB --remote --env staging --file seed/staging-provider.sql
+        run: pnpm exec wrangler d1 execute DB --remote --env staging --file seed/staging.sql
