@@ -131,7 +131,7 @@ function ExperienceDetail() {
         <EmptyState
           icon={<CircleAlert aria-hidden />}
           title="Esta experiencia ya no está disponible"
-          description="La oferta ha caducado o la fecha de servicio ya ha pasado."
+          description="La oferta ha caducado, la fecha de servicio ya ha pasado o ya la ha reservado otra persona."
           action={<CatalogButton to="/experiencias">Ver experiencias disponibles</CatalogButton>}
         />
       </DetailPage>
