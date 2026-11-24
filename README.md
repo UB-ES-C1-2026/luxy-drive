@@ -628,3 +628,16 @@ cliente de la sesión, con las reglas de SP-003 (#93). Desde el frontend:
 "Disponible" es la definición de US-001 más **sin reserva confirmada**: una experiencia
 reservada sale del catálogo y de las ofertas, y su detalle responde `410`. La base de datos
 impide dos reservas confirmadas para la misma experiencia (índice único parcial).
+
+### Mis reservas (US-019.b)
+
+`GET /api/reservations` devuelve las solicitudes del cliente de la sesión, primero las de
+servicio más próximo, con su estado actual (`pending`, `confirmed` o `rejected`). Desde el
+frontend: `client.api.reservations.$get()`. Responde `200` con una lista (vacía si no tiene
+ninguna) de objetos con la misma forma que `POST /api/reservations`. Nunca incluye
+solicitudes de otros clientes ni el email del cliente.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Sin sesión | `401` | `{ "error": "unauthorized" }` |
+| Sesión de proveedor | `403` | `{ "error": "forbidden" }` |
