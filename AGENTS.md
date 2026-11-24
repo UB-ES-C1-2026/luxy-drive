@@ -7,6 +7,7 @@ Reglas obligatorias para cualquier agente (Claude Code, Codex, Cursor, Copilot�
 - `apps/web`: front estático. Vite, React 19, TanStack Router (rutas por archivo en `src/routes/`), Tailwind 4.
 - `apps/api`: Hono en Cloudflare Workers. D1 (SQLite) en el binding `DB`; migraciones en `apps/api/migrations/`.
 - `packages/ui`: `@luxydrive/ui`, la única librería de componentes. Referencia visual: [`DESIGN.md`](DESIGN.md).
+- `apps/acceptance`: tests de aceptación con Playwright, uno por criterio de cada user story, contra dev (`pnpm acceptance`). No forman parte de `pnpm test`.
 - Cada entorno (dev, staging, producción) es un solo Worker: sirve `apps/web/dist` y ejecuta Hono en `/api/*`. Su configuración está en `apps/api/wrangler.jsonc`.
 
 ## Flujo

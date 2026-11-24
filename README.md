@@ -57,8 +57,28 @@ En local, D1 se simula en `apps/api/.wrangler/`: no hace falta cuenta de Cloudfl
 | `pnpm lint` / `pnpm format` | Biome (lint + formato) |
 | `pnpm typecheck` | TypeScript en todos los paquetes |
 | `pnpm test` | Tests (la API usa Vitest dentro del runtime de Workers) |
+| `pnpm acceptance` | Tests de aceptación con Playwright contra dev (ver [Tests de aceptación](#tests-de-aceptación-tr-009)) |
 | `pnpm build` | Build del front |
 | `pnpm db:new <nombre>` | Crea una migración D1 en `apps/api/migrations/` |
+
+## Tests de aceptación (TR-009)
+
+`apps/acceptance` tiene **un test por criterio de aceptación** de cada user story, con la historia y el criterio en el título (`US-018 · C2 · …`). Se ejecutan con Playwright contra un entorno desplegado, por defecto dev, y su resultado (PASS o FAIL) es el que QA anota en la tarjeta de Trello.
+
+```bash
+pnpm --filter @luxydrive/acceptance exec playwright install chromium   # solo la primera vez
+pnpm acceptance                                                        # contra dev
+pnpm acceptance us-018                                                 # solo una historia
+ACCEPTANCE_BASE_URL=http://localhost:8787 pnpm acceptance              # contra `pnpm dev`
+```
+
+También desde Actions → **Acceptance tests** (manual, contra dev o staging): el resultado por criterio queda en el log y el informe HTML, como artefacto.
+
+- **No bloquean las PRs.** No forman parte de `pnpm test` ni de la CI: dev es un entorno compartido y un fallo allí puede venir de otra PR. Lo que bloquea sigue siendo la CI.
+- **Cada test crea sus datos** por la API (cuentas `qa-…@luxydrive.test` y anuncios `QA · …`), así que no depende del seed ni del orden, y retira sus anuncios al terminar.
+- **Nunca contra producción:** la configuración lo rechaza.
+- **API antes que pantalla.** Si el criterio es una regla («no puede retirar el anuncio de otro»), el test llama a la API; el navegador solo se usa cuando el criterio habla de lo que ve la persona. Las variantes y los casos de error de cada endpoint siguen en `apps/api/test/`.
+- Para una historia nueva: `apps/acceptance/tests/us-0XX.spec.ts`, con los helpers de `support/actors.ts`.
 
 ## Estrategia de ramas
 
@@ -440,6 +460,7 @@ Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudfl
 | `main-guard.yml` | PR contra `main` |
 | `back-merge.yml` | push a `main` |
 | `reset-dev-db.yml` | manual |
+| `acceptance.yml` | manual |
 
 ## SP-002: autenticación y roles (Sprint 1)
 
