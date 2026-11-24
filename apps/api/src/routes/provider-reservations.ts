@@ -1,7 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
-import type { AuthEnv } from "../auth/session";
+import { type AuthEnv, requireRole, requireUser, sameOrigin } from "../auth/session";
 import { AVAILABLE } from "../availability";
 import { RESERVATION_SELECT, type ReservationRow, toReservation } from "./reservations";
 
@@ -23,8 +23,9 @@ type Target = {
   available: 0 | 1;
 };
 
-// Mounted inside the provider router, behind its provider session.
+// Mounted in index.ts before the provider router, with the same provider-only rules.
 export const providerReservations = new Hono<AuthEnv>()
+  .use(sameOrigin, requireUser, requireRole("provider"))
   .get("/", async (c) => {
     try {
       // Ownership is part of the WHERE: only requests on this provider's listings (SP-003).

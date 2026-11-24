@@ -5,7 +5,6 @@ import { type AuthEnv, requireRole, requireUser, sameOrigin } from "../auth/sess
 import { madridLocalToUnix } from "../madrid-time";
 import { draftBody, draftChanges, draftError } from "../schemas/draft";
 import { profileBody, profileError } from "../schemas/provider-profile";
-import { providerReservations } from "./provider-reservations";
 
 type ProfileRow = {
   id: number;
@@ -305,5 +304,4 @@ export const provider = new Hono<AuthEnv>()
     } catch {
       return c.json({ error: "internal_error" } as const, 500);
     }
-  })
-  .route("/reservations", providerReservations);
+  });
