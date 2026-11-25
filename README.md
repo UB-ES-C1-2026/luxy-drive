@@ -363,7 +363,7 @@ sesión, `403` a una cuenta de cliente). Las escrituras exigen el `Origin` propi
 | `POST /api/provider/experiences` con al menos `title` | `201` con el borrador |
 | `GET /api/provider/experiences` | `200` con los anuncios propios (borradores y publicados), del más nuevo al más antiguo |
 | `GET /api/provider/experiences/:id` | `200` con el anuncio propio; `403 forbidden` si es de otro proveedor; `404 not_found` si no existe |
-| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el borrador actualizado; `403` si es de otro; `409 already_published` si ya está publicado |
+| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el anuncio actualizado (borrador o publicado, ver US-013.b); `403` si es de otro; `409 already_withdrawn` si está retirado |
 
 Campos: `title` (obligatorio, hasta 120 caracteres), y opcionales `description`,
 `category` (`jet`, `yacht` o `camper`), `vehicle`, `location` y `capacity` (entero
@@ -418,6 +418,45 @@ Para publicar hacen falta el precio y la fecha de servicio, y también lo que mu
 catálogo y el detalle: `description`, `category`, `vehicle`, `location` y `capacity`.
 `fields` los lista todos, con el precio y la fecha primero. Si no se publica, el anuncio
 sigue siendo un borrador oculto.
+
+### Corregir un anuncio publicado (US-013.b)
+
+`PATCH /api/provider/experiences/:id` también corrige un anuncio propio **ya publicado**,
+con los mismos campos y validaciones que el borrador (US-009.b y US-011.b). Antes respondía
+`409 already_published`. El cambio se ve enseguida en el catálogo, las ofertas y el detalle.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Cambio válido | `200` | El anuncio con `status: "published"` |
+| Deja vacío un campo de texto que el catálogo necesita (`description`, `vehicle`, `location`) | `400` | `{ "error": "missing_fields", "fields": [...] }` |
+| Fecha y hora ya pasadas | `400` | `{ "error": "service_at_in_past" }` |
+| Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` (no cambia) |
+| Anuncio retirado (US-014.b) | `409` | `{ "error": "already_withdrawn" }` (no cambia) |
+
+Si cambia `serviceAt`, la oferta se ajusta para que siga siendo coherente: una oferta
+`standard` dura hasta la nueva fecha de servicio, y una oferta especial (`last_minute` o
+`empty_leg`) nunca termina después del servicio. Si no se guarda, no cambia ningún campo.
+
+### Retirar un anuncio publicado (US-014.b)
+
+`POST /api/provider/experiences/:id/withdraw` deja de ofrecer un anuncio publicado propio.
+El anuncio no se borra: queda con la oferta inactiva y deja de estar **disponible**
+(definición de US-001), así que desaparece de `GET /api/experiences` y de `GET /api/offers`,
+y su detalle responde `410 not_available`. En `GET /api/provider/experiences[/:id]` aparece
+con `status: "withdrawn"` (los otros estados son `draft` y `published`).
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Anuncio propio publicado | `200` | El anuncio con `status: "withdrawn"` |
+| Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` (sigue disponible) |
+| Es un borrador | `409` | `{ "error": "not_published" }` |
+| Ya estaba retirado | `409` | `{ "error": "already_withdrawn" }` |
+| No existe | `404` | `{ "error": "not_found" }` |
+| `id` no válido | `400` | `{ "error": "invalid_id" }` |
+
+En la base de datos, `withdrawn_at` (migración `experience_withdrawn_at`, segundos Unix UTC)
+guarda cuándo se retiró; `NULL` significa que no está retirado. Desde el frontend:
+`client.api.provider.experiences[":id"].withdraw.$post({ param: { id: "1" } })`.
 
 ### Ofertas especiales de un anuncio propio (US-016.b)
 

@@ -39,10 +39,16 @@ type ListingRow = {
   price_cents: number | null;
   service_at: number | null;
   published: 0 | 1;
+  withdrawn_at: number | null;
 };
 
 const LISTING_COLUMNS =
-  "id, provider_id, title, description, category, vehicle, location, capacity, price_cents, service_at, published";
+  "id, provider_id, title, description, category, vehicle, location, capacity, price_cents, service_at, published, withdrawn_at";
+
+function listingStatus(row: ListingRow) {
+  if (row.published === 0) return "draft" as const;
+  return row.withdrawn_at === null ? ("published" as const) : ("withdrawn" as const);
+}
 
 function toListing(row: ListingRow) {
   return {
@@ -57,7 +63,7 @@ function toListing(row: ListingRow) {
     currency: "EUR" as const,
     priceUnit: "experiencia completa" as const,
     serviceAt: row.service_at === null ? null : new Date(row.service_at * 1000).toISOString(),
-    status: row.published === 1 ? ("published" as const) : ("draft" as const),
+    status: listingStatus(row),
   };
 }
 
@@ -88,6 +94,9 @@ const REQUIRED_TO_PUBLISH = [
   ["location", "location"],
   ["capacity", "capacity"],
 ] as const satisfies readonly (readonly [keyof ListingRow, string])[];
+
+// Text fields a published listing needs; an empty one would leave it incomplete.
+const EDITABLE_TEXT = ["description", "vehicle", "location"] as const;
 
 type OfferStateRow = {
   provider_id: number | null;
@@ -260,7 +269,31 @@ export const provider = new Hono<AuthEnv>()
     const { priceCents, serviceAt, past } = priceAndDate(changes);
     if (past) return c.json({ error: "service_at_in_past" } as const, 400);
     try {
-      // Ownership and draft state are part of the WHERE: nothing else can be changed.
+      const existing = await c.env.DB.prepare(
+        "SELECT provider_id, published, withdrawn_at FROM experiences WHERE id = ?",
+      )
+        .bind(id)
+        .first<Pick<ListingRow, "provider_id" | "published" | "withdrawn_at">>();
+      if (!existing) return c.json({ error: "not_found" } as const, 404);
+      if (existing.provider_id !== userId) return c.json({ error: "forbidden" } as const, 403);
+      // A withdrawn listing (US-014) is not corrected any more.
+      if (existing.withdrawn_at !== null) {
+        return c.json({ error: "already_withdrawn" } as const, 409);
+      }
+
+      // A published listing can be corrected (US-013), but the catalog and the detail
+      // must never show it with an empty field.
+      if (existing.published === 1) {
+        const emptied = EDITABLE_TEXT.filter((field) => changes[field] === "");
+        if (emptied.length > 0) {
+          return c.json({ error: "missing_fields" as const, fields: emptied }, 400);
+        }
+      }
+
+      // Ownership is part of the WHERE, and so is not being withdrawn, in case that changed
+      // in between: nothing else can be changed. A new service date also moves the end of
+      // the offer: a standard offer lasts until the service starts, and a special one can
+      // never outlast it.
       const row = await c.env.DB.prepare(
         `UPDATE experiences
          SET title = COALESCE(?, title),
@@ -270,8 +303,13 @@ export const provider = new Hono<AuthEnv>()
              location = COALESCE(?, location),
              capacity = COALESCE(?, capacity),
              price_cents = COALESCE(?, price_cents),
-             service_at = COALESCE(?, service_at)
-         WHERE id = ? AND provider_id = ? AND published = 0
+             service_at = COALESCE(?, service_at),
+             offer_expires_at = CASE
+               WHEN published = 0 OR ? IS NULL THEN offer_expires_at
+               WHEN offer_type = 'standard' THEN ?
+               ELSE MIN(offer_expires_at, ?)
+             END
+         WHERE id = ? AND provider_id = ? AND withdrawn_at IS NULL
          RETURNING ${LISTING_COLUMNS}`,
       )
         .bind(
@@ -283,20 +321,15 @@ export const provider = new Hono<AuthEnv>()
           changes.capacity ?? null,
           priceCents,
           serviceAt,
+          serviceAt,
+          serviceAt,
+          serviceAt,
           id,
           userId,
         )
         .first<ListingRow>();
-      if (row) return c.json(toListing(row), 200);
-
-      const existing = await c.env.DB.prepare(
-        "SELECT provider_id, published FROM experiences WHERE id = ?",
-      )
-        .bind(id)
-        .first<Pick<ListingRow, "provider_id" | "published">>();
-      if (!existing) return c.json({ error: "not_found" } as const, 404);
-      if (existing.provider_id !== userId) return c.json({ error: "forbidden" } as const, 403);
-      return c.json({ error: "already_published" } as const, 409);
+      if (!row) return c.json({ error: "already_withdrawn" } as const, 409);
+      return c.json(toListing(row), 200);
     } catch {
       return c.json({ error: "internal_error" } as const, 500);
     }
@@ -337,6 +370,35 @@ export const provider = new Hono<AuthEnv>()
         .first<ListingRow>();
       if (!published) return c.json({ error: "already_published" } as const, 409);
       return c.json(toListing(published), 200);
+    } catch {
+      return c.json({ error: "internal_error" } as const, 500);
+    }
+  })
+  .post("/experiences/:id/withdraw", validId, async (c) => {
+    const { id } = c.req.valid("param");
+    const userId = c.get("user").id;
+    try {
+      // Turning the offer off is enough to leave the catalog, the offers and the detail:
+      // they only show "available" listings (US-001). The listing itself is kept.
+      const row = await c.env.DB.prepare(
+        `UPDATE experiences
+         SET offer_active = 0, withdrawn_at = ?
+         WHERE id = ? AND provider_id = ? AND published = 1 AND withdrawn_at IS NULL
+         RETURNING ${LISTING_COLUMNS}`,
+      )
+        .bind(Math.floor(Date.now() / 1000), id, userId)
+        .first<ListingRow>();
+      if (row) return c.json(toListing(row), 200);
+
+      const existing = await c.env.DB.prepare(
+        "SELECT provider_id, published, withdrawn_at FROM experiences WHERE id = ?",
+      )
+        .bind(id)
+        .first<Pick<ListingRow, "provider_id" | "published" | "withdrawn_at">>();
+      if (!existing) return c.json({ error: "not_found" } as const, 404);
+      if (existing.provider_id !== userId) return c.json({ error: "forbidden" } as const, 403);
+      if (existing.published === 0) return c.json({ error: "not_published" } as const, 409);
+      return c.json({ error: "already_withdrawn" } as const, 409);
     } catch {
       return c.json({ error: "internal_error" } as const, 500);
     }
