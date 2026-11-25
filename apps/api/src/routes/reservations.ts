@@ -85,4 +85,18 @@ export const reservations = new Hono<AuthEnv>()
         return c.json({ error: "internal_error" } as const, 500);
       }
     },
-  );
+  )
+  // US-019.b: only the session client's own requests, soonest service first.
+  .get("/", async (c) => {
+    try {
+      const { results } = await c.env.DB.prepare(
+        `${RESERVATION_SELECT} WHERE reservations.client_id = ?
+         ORDER BY experiences.service_at ASC, reservations.created_at DESC, reservations.id DESC`,
+      )
+        .bind(c.get("user").id)
+        .all<ReservationRow>();
+      return c.json(results.map(toReservation), 200);
+    } catch {
+      return c.json({ error: "internal_error" } as const, 500);
+    }
+  });

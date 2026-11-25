@@ -13,6 +13,7 @@ import {
 import { createFileRoute, createLink, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { AccountNav } from "../account-nav";
+import { MyReservations } from "../my-reservations";
 import { loadSession, logout, useSessionUser } from "../session";
 
 export const Route = createFileRoute("/cuenta")({
@@ -77,6 +78,7 @@ function Account() {
           {leaving ? "Cerrando sesión…" : "Cerrar sesión"}
         </Button>
       </div>
+      {user.role === "client" && <MyReservations key={user.id} />}
     </AccountPage>
   );
 }
