@@ -152,7 +152,7 @@ it.each([
   expect(await response.json()).toEqual({ error });
 });
 
-it("does not edit a listing that is already published", async () => {
+it("edits a listing that is already published (US-013)", async () => {
   const cookie = await signup("a@example.com");
   const { draft } = await createDraft(cookie, {
     title: "Velero",
@@ -171,8 +171,10 @@ it("does not edit a listing that is already published", async () => {
   const response = await send("PATCH", `/provider/experiences/${draft.id}`, cookie, {
     title: "Otro",
   });
-  expect(response.status).toBe(409);
-  expect(await response.json()).toEqual({ error: "already_published" });
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual(
+    expect.objectContaining({ title: "Otro", status: "published" }),
+  );
 });
 
 it("never stores a published listing with missing fields", async () => {

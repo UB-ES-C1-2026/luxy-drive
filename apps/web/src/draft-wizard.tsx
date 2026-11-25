@@ -190,23 +190,35 @@ function payload(step: Step, value: string) {
 
 type Problem = { title: string; body: string };
 
+// Un anuncio publicado ya se ve en el catálogo con todos sus datos.
+const cantBeEmpty = "Este dato se ve en el catálogo: escribe uno nuevo en lugar de dejarlo vacío.";
+
 const saveFailed: Problem = {
   title: "No se ha podido guardar",
   body: "Comprueba tu conexión e inténtalo de nuevo. No hemos borrado lo que has escrito.",
 };
 
+// Se ha retirado mientras se corregía, por ejemplo desde otra pestaña (US-014).
+const withdrawn: Problem = {
+  title: "Este anuncio está retirado",
+  body: "Un anuncio retirado ya no se puede corregir. Vuelve al resumen para verlo.",
+};
+
 /**
  * Una pregunta del borrador. "Siguiente" guarda la respuesta (la primera crea el borrador),
  * así que el proveedor puede dejarlo en cualquier paso y seguir otro día.
+ * Con `published` se corrige un dato de un anuncio ya publicado (US-013).
  */
 export function DraftStep({
   draft,
   index,
+  published = false,
   onSaved,
   onBack,
 }: {
   draft?: Draft;
   index: number;
+  published?: boolean;
   /** `exit`: el proveedor ha pulsado "Guardar y salir". */
   onSaved: (saved: Draft, exit: boolean) => Promise<void>;
   onBack?: () => void;
@@ -221,13 +233,20 @@ export function DraftStep({
 
   const save = async (next: string, exit: boolean) => {
     setProblem(null);
+    if (published && !next.trim()) {
+      setError(cantBeEmpty);
+      document.getElementById(inputId)?.focus();
+      return;
+    }
     if (!step.valid(next)) {
       setError(step.invalid);
       document.getElementById(inputId)?.focus();
       return;
     }
-    // Sin cambios no hace falta guardar.
-    if (draft && next.trim() === step.read(draft).trim()) return onSaved(draft, exit);
+    // Sin cambios no hace falta guardar; en un publicado tampoco hay nada que avisar.
+    if (draft && next.trim() === step.read(draft).trim()) {
+      return published ? onBack?.() : onSaved(draft, exit);
+    }
 
     setSaving(true);
     try {
@@ -241,8 +260,9 @@ export function DraftStep({
       if (res.ok) return await onSaved(await res.json(), exit);
       const status: number = res.status;
       if (status === 400) {
-        const { error: code } = await res.json();
-        if (errorField[code] === step.field) return setError(step.invalid);
+        const body = await res.json();
+        if ("fields" in body) return setError(cantBeEmpty);
+        if (errorField[body.error] === step.field) return setError(step.invalid);
       }
       if (status === 401) {
         return setProblem({
@@ -251,10 +271,8 @@ export function DraftStep({
         });
       }
       if (status === 409) {
-        return setProblem({
-          title: "Este anuncio ya está publicado",
-          body: "Los anuncios publicados ya no se editan como borrador.",
-        });
+        const { error: code } = await res.json();
+        if (code === "already_withdrawn") return setProblem(withdrawn);
       }
       setProblem(saveFailed);
     } catch {
@@ -277,15 +295,17 @@ export function DraftStep({
 
   const empty = !value.trim();
   const last = index === steps.length - 1;
+  // La ayuda del título habla del borrador: no aplica al corregir un anuncio publicado.
+  const help = published && step.field === "title" ? undefined : step.help;
 
   return (
     <form noValidate onSubmit={submit} className="flex max-w-2xl flex-col gap-8">
-      <StepProgress step={index + 1} total={steps.length} />
+      {!published && <StepProgress step={index + 1} total={steps.length} />}
       <div className="flex flex-col gap-2">
         <Heading as="h1" variant="display-xl">
           {step.question}
         </Heading>
-        {step.help && <Text tone="muted">{step.help}</Text>}
+        {help && <Text tone="muted">{help}</Text>}
       </div>
       {problem && (
         <Notice tone="error" title={problem.title}>
@@ -349,18 +369,20 @@ export function DraftStep({
         <Button type="submit" value="next" disabled={saving}>
           {saving
             ? "Guardando…"
-            : last
-              ? "Ver el resumen"
-              : empty && step.field !== "title"
-                ? "Saltar por ahora"
-                : "Siguiente"}
+            : published
+              ? "Guardar cambios"
+              : last
+                ? "Ver el resumen"
+                : empty && step.field !== "title"
+                  ? "Saltar por ahora"
+                  : "Siguiente"}
         </Button>
         {onBack && (
           <Button variant="tertiary" onClick={onBack} disabled={saving}>
-            Atrás
+            {published ? "Cancelar" : "Atrás"}
           </Button>
         )}
-        {draft && (
+        {draft && !published && (
           <Button
             type="submit"
             value="exit"
