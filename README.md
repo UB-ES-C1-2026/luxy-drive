@@ -445,6 +445,10 @@ Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudfl
 | `reset-dev-db.yml` | manual |
 | `seed-staging.yml` | manual |
 
+Después de cada despliegue (dev, staging y producción), la acción `.github/actions/deploy` llama a
+`/api/health` del entorno y el job falla si no responde `200` tras 5 intentos (TR-006). El error
+aparece en la pestaña Actions con el nombre del entorno: `Health check (<entorno>)`.
+
 ## SP-002: autenticación y roles (Sprint 1)
 
 Decisión de diseño para #29. La implementación corresponde a #45 (registro de
