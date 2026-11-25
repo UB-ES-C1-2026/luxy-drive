@@ -363,7 +363,7 @@ sesión, `403` a una cuenta de cliente). Las escrituras exigen el `Origin` propi
 | `POST /api/provider/experiences` con al menos `title` | `201` con el borrador |
 | `GET /api/provider/experiences` | `200` con los anuncios propios (borradores y publicados), del más nuevo al más antiguo |
 | `GET /api/provider/experiences/:id` | `200` con el anuncio propio; `403 forbidden` si es de otro proveedor; `404 not_found` si no existe |
-| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el anuncio actualizado (borrador o publicado, ver US-013.b); `403` si es de otro |
+| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el anuncio actualizado (borrador o publicado, ver US-013.b); `403` si es de otro; `409 already_withdrawn` si está retirado |
 
 Campos: `title` (obligatorio, hasta 120 caracteres), y opcionales `description`,
 `category` (`jet`, `yacht` o `camper`), `vehicle`, `location` y `capacity` (entero
@@ -431,6 +431,7 @@ con los mismos campos y validaciones que el borrador (US-009.b y US-011.b). Ante
 | Deja vacío un campo de texto que el catálogo necesita (`description`, `vehicle`, `location`) | `400` | `{ "error": "missing_fields", "fields": [...] }` |
 | Fecha y hora ya pasadas | `400` | `{ "error": "service_at_in_past" }` |
 | Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` (no cambia) |
+| Anuncio retirado (US-014.b) | `409` | `{ "error": "already_withdrawn" }` (no cambia) |
 
 Si cambia `serviceAt`, la oferta se ajusta para que siga siendo coherente: una oferta
 `standard` dura hasta la nueva fecha de servicio, y una oferta especial (`last_minute` o

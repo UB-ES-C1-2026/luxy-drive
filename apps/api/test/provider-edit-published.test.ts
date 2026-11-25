@@ -160,3 +160,27 @@ it("keeps letting a draft be emptied while it is still a draft", async () => {
     expect.objectContaining({ description: "", status: "draft" }),
   );
 });
+
+it("does not correct a withdrawn listing", async () => {
+  const id = await published();
+  await send("POST", `/provider/experiences/${id}/withdraw`);
+  const response = await send("PATCH", `/provider/experiences/${id}`, {
+    title: "Otro título",
+    price: 100,
+  });
+  expect(response.status).toBe(409);
+  expect(await response.json()).toEqual({ error: "already_withdrawn" });
+  const mine = await send("GET", `/provider/experiences/${id}`);
+  expect(await mine.json()).toEqual(
+    expect.objectContaining({ title: "Velero en Palma", price: 900, status: "withdrawn" }),
+  );
+});
+
+it("still answers 403 to another provider on a withdrawn listing", async () => {
+  const id = await published();
+  await send("POST", `/provider/experiences/${id}/withdraw`);
+  const other = await signup("b@example.com");
+  const response = await send("PATCH", `/provider/experiences/${id}`, { title: "Mío" }, other);
+  expect(response.status).toBe(403);
+  expect(await response.json()).toEqual({ error: "forbidden" });
+});
