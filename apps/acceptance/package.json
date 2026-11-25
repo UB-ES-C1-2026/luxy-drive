@@ -1,0 +1,13 @@
+{
+  "name": "@luxydrive/acceptance",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "acceptance": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "22.20.5"
+  }
+}

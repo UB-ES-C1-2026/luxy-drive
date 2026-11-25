@@ -1,0 +1,35 @@
+name: Acceptance tests
+
+# Tests de aceptación (TR-009): un test por criterio de las user stories, contra un entorno
+# desplegado. Manual y solo informativo: no bloquea PRs. Producción no se puede elegir.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Entorno contra el que se ejecutan
+        type: choice
+        options: [dev, staging]
+        default: dev
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    env:
+      ACCEPTANCE_BASE_URL: https://${{ inputs.environment }}.luxydrive.workers.dev
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - name: Instalar el navegador
+        run: pnpm --filter @luxydrive/acceptance exec playwright install --with-deps chromium
+      - name: Tests de aceptación
+        run: pnpm acceptance
+      - name: Guardar el informe
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: acceptance-report-${{ inputs.environment }}
+          path: apps/acceptance/playwright-report/
+          retention-days: 14
