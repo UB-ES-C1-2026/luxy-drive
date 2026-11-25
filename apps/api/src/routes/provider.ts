@@ -270,15 +270,29 @@ export const provider = new Hono<AuthEnv>()
     if (past) return c.json({ error: "service_at_in_past" } as const, 400);
     try {
       const existing = await c.env.DB.prepare(
-        "SELECT provider_id, published, withdrawn_at FROM experiences WHERE id = ?",
+        "SELECT provider_id, published, withdrawn_at, offer_type, price_cents FROM experiences WHERE id = ?",
       )
         .bind(id)
-        .first<Pick<ListingRow, "provider_id" | "published" | "withdrawn_at">>();
+        .first<
+          Pick<ListingRow, "provider_id" | "published" | "withdrawn_at" | "price_cents"> &
+            Pick<OfferStateRow, "offer_type">
+        >();
       if (!existing) return c.json({ error: "not_found" } as const, 404);
       if (existing.provider_id !== userId) return c.json({ error: "forbidden" } as const, 403);
       // A withdrawn listing (US-014) is not corrected any more.
       if (existing.withdrawn_at !== null) {
         return c.json({ error: "already_withdrawn" } as const, 409);
+      }
+
+      // During a special offer price_cents is the offer price and ending the offer brings
+      // the normal one back, so a new price would be lost: the offer has to end first
+      // (US-016), even when it has already expired.
+      if (
+        priceCents !== null &&
+        priceCents !== existing.price_cents &&
+        existing.offer_type !== "standard"
+      ) {
+        return c.json({ error: "offer_active" } as const, 409);
       }
 
       // A published listing can be corrected (US-013), but the catalog and the detail
@@ -290,10 +304,10 @@ export const provider = new Hono<AuthEnv>()
         }
       }
 
-      // Ownership is part of the WHERE, and so is not being withdrawn, in case that changed
-      // in between: nothing else can be changed. A new service date also moves the end of
-      // the offer: a standard offer lasts until the service starts, and a special one can
-      // never outlast it.
+      // Ownership is part of the WHERE, and so are not being withdrawn and the price rule
+      // above, in case that changed in between: nothing else can be changed. A new service
+      // date also moves the end of the offer: a standard offer lasts until the service
+      // starts, and a special one can never outlast it.
       const row = await c.env.DB.prepare(
         `UPDATE experiences
          SET title = COALESCE(?, title),
@@ -310,6 +324,7 @@ export const provider = new Hono<AuthEnv>()
                ELSE MIN(offer_expires_at, ?)
              END
          WHERE id = ? AND provider_id = ? AND withdrawn_at IS NULL
+           AND (? IS NULL OR offer_type = 'standard' OR price_cents = ?)
          RETURNING ${LISTING_COLUMNS}`,
       )
         .bind(
@@ -326,9 +341,11 @@ export const provider = new Hono<AuthEnv>()
           serviceAt,
           id,
           userId,
+          priceCents,
+          priceCents,
         )
         .first<ListingRow>();
-      if (!row) return c.json({ error: "already_withdrawn" } as const, 409);
+      if (!row) return c.json({ error: "listing_changed" } as const, 409);
       return c.json(toListing(row), 200);
     } catch {
       return c.json({ error: "internal_error" } as const, 500);

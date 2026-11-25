@@ -363,7 +363,7 @@ sesión, `403` a una cuenta de cliente). Las escrituras exigen el `Origin` propi
 | `POST /api/provider/experiences` con al menos `title` | `201` con el borrador |
 | `GET /api/provider/experiences` | `200` con los anuncios propios (borradores y publicados), del más nuevo al más antiguo |
 | `GET /api/provider/experiences/:id` | `200` con el anuncio propio; `403 forbidden` si es de otro proveedor; `404 not_found` si no existe |
-| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el anuncio actualizado (borrador o publicado, ver US-013.b); `403` si es de otro; `409 already_withdrawn` si está retirado |
+| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el anuncio actualizado (borrador o publicado, ver US-013.b); `403` si es de otro; `409 already_withdrawn` si está retirado; `409 offer_active` si cambia el precio con una oferta especial |
 
 Campos: `title` (obligatorio, hasta 120 caracteres), y opcionales `description`,
 `category` (`jet`, `yacht` o `camper`), `vehicle`, `location` y `capacity` (entero
@@ -432,10 +432,16 @@ con los mismos campos y validaciones que el borrador (US-009.b y US-011.b). Ante
 | Fecha y hora ya pasadas | `400` | `{ "error": "service_at_in_past" }` |
 | Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` (no cambia) |
 | Anuncio retirado (US-014.b) | `409` | `{ "error": "already_withdrawn" }` (no cambia) |
+| Otro precio con una oferta especial sin terminar (US-016.b) | `409` | `{ "error": "offer_active" }` (no cambia) |
+| El anuncio se retira o recibe una oferta mientras se guarda | `409` | `{ "error": "listing_changed" }` (no cambia) |
 
 Si cambia `serviceAt`, la oferta se ajusta para que siga siendo coherente: una oferta
 `standard` dura hasta la nueva fecha de servicio, y una oferta especial (`last_minute` o
 `empty_leg`) nunca termina después del servicio. Si no se guarda, no cambia ningún campo.
+
+El precio no se cambia mientras el anuncio tiene una oferta especial, en curso o caducada:
+primero se termina con `DELETE /api/provider/experiences/:id/offer` (US-016.b), que devuelve
+el precio normal. Los demás campos sí se corrigen durante la oferta.
 
 ### Retirar un anuncio publicado (US-014.b)
 

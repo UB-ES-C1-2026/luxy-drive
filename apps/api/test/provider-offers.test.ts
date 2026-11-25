@@ -216,3 +216,69 @@ it("answers 409 when there is no special offer to end, 404 and 400 otherwise", a
   expect(invalid.status).toBe(400);
   expect(await invalid.json()).toEqual({ error: "invalid_id" });
 });
+
+it.each([
+  ["running", false],
+  ["expired", true],
+])("does not change the price while a special offer is %s", async (_, expired) => {
+  const id = await published();
+  await send("POST", `/provider/experiences/${id}/offer`, flash);
+  if (expired) await expire(id);
+  const response = await send("PATCH", `/provider/experiences/${id}`, {
+    title: "Otro título",
+    price: 1000,
+  });
+  expect(response.status).toBe(409);
+  expect(await response.json()).toEqual({ error: "offer_active" });
+  const mine = await send("GET", `/provider/experiences/${id}`);
+  expect(await mine.json()).toEqual(
+    expect.objectContaining({ title: "Velero en Palma", price: 650.5 }),
+  );
+  if (!expired) {
+    expect(await offers()).toEqual([
+      expect.objectContaining({ id, price: 650.5, originalPrice: 900 }),
+    ]);
+  }
+});
+
+it("changes the price once the special offer has ended", async () => {
+  const id = await published();
+  await send("POST", `/provider/experiences/${id}/offer`, flash);
+  await send("DELETE", `/provider/experiences/${id}/offer`);
+  const response = await send("PATCH", `/provider/experiences/${id}`, { price: 1000 });
+  expect(response.status).toBe(200);
+  const catalog = await SELF.fetch(`${base}/experiences`);
+  expect(await catalog.json()).toEqual([expect.objectContaining({ id, price: 1000 })]);
+});
+
+it("corrects the rest of a listing with a special offer without touching the offer", async () => {
+  const id = await published();
+  await send("POST", `/provider/experiences/${id}/offer`, flash);
+  const response = await send("PATCH", `/provider/experiences/${id}`, {
+    title: "Velero en la bahía",
+    price: 650.5,
+  });
+  expect(response.status).toBe(200);
+  expect(await offers()).toEqual([
+    expect.objectContaining({ id, title: "Velero en la bahía", price: 650.5, originalPrice: 900 }),
+  ]);
+});
+
+it("does not put offers on a withdrawn listing", async () => {
+  const id = await published();
+  await send("POST", `/provider/experiences/${id}/withdraw`);
+  const response = await send("POST", `/provider/experiences/${id}/offer`, flash);
+  expect(response.status).toBe(409);
+  expect(await response.json()).toEqual({ error: "not_available" });
+});
+
+it("keeps a listing hidden when it is withdrawn during an offer and the offer ends", async () => {
+  const id = await published();
+  await send("POST", `/provider/experiences/${id}/offer`, flash);
+  await send("POST", `/provider/experiences/${id}/withdraw`);
+  expect(await offers()).toEqual([]);
+  await send("DELETE", `/provider/experiences/${id}/offer`);
+  expect(await offers()).toEqual([]);
+  const catalog = await SELF.fetch(`${base}/experiences`);
+  expect(await catalog.json()).toEqual([]);
+});
