@@ -436,6 +436,27 @@ Si cambia `serviceAt`, la oferta se ajusta para que siga siendo coherente: una o
 `standard` dura hasta la nueva fecha de servicio, y una oferta especial (`last_minute` o
 `empty_leg`) nunca termina después del servicio. Si no se guarda, no cambia ningún campo.
 
+### Retirar un anuncio publicado (US-014.b)
+
+`POST /api/provider/experiences/:id/withdraw` deja de ofrecer un anuncio publicado propio.
+El anuncio no se borra: queda con la oferta inactiva y deja de estar **disponible**
+(definición de US-001), así que desaparece de `GET /api/experiences` y de `GET /api/offers`,
+y su detalle responde `410 not_available`. En `GET /api/provider/experiences[/:id]` aparece
+con `status: "withdrawn"` (los otros estados son `draft` y `published`).
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Anuncio propio publicado | `200` | El anuncio con `status: "withdrawn"` |
+| Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` (sigue disponible) |
+| Es un borrador | `409` | `{ "error": "not_published" }` |
+| Ya estaba retirado | `409` | `{ "error": "already_withdrawn" }` |
+| No existe | `404` | `{ "error": "not_found" }` |
+| `id` no válido | `400` | `{ "error": "invalid_id" }` |
+
+En la base de datos, `withdrawn_at` (migración `experience_withdrawn_at`, segundos Unix UTC)
+guarda cuándo se retiró; `NULL` significa que no está retirado. Desde el frontend:
+`client.api.provider.experiences[":id"].withdraw.$post({ param: { id: "1" } })`.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
