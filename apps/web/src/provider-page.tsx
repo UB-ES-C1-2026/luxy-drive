@@ -48,7 +48,7 @@ export function ProviderPage({
           <Section className="flex flex-col gap-6">
             {title && (
               <div className="flex flex-col gap-1">
-                <Heading as="h1" variant="display-xl">
+                <Heading as="h1" variant="display-xl" className="break-words">
                   {title}
                 </Heading>
                 {subtitle && <Text tone="muted">{subtitle}</Text>}

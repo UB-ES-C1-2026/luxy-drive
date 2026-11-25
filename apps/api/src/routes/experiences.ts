@@ -1,6 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
+import { AVAILABLE } from "../availability";
 import type { Bindings } from "../env";
 
 type ExperienceSummaryRow = {
@@ -105,8 +106,7 @@ export const experiences = new Hono<{ Bindings: Bindings }>()
         const { results } = await c.env.DB.prepare(
           `SELECT id, title, category, location, service_at, price_cents, offer_type
            FROM experiences
-           WHERE published = 1 AND offer_active = 1
-             AND offer_expires_at > ? AND service_at > ?
+           WHERE ${AVAILABLE}
              AND (? IS NULL OR category = ?)
              AND (? IS NULL OR service_at >= ?)
              AND (? IS NULL OR service_at < ?)
@@ -138,7 +138,7 @@ export const experiences = new Hono<{ Bindings: Bindings }>()
         const row = await c.env.DB.prepare(
           `SELECT id, title, description, category, vehicle, location, service_at,
                   capacity, price_cents, offer_type,
-                  (offer_active = 1 AND offer_expires_at > ? AND service_at > ?) AS available
+                  ${AVAILABLE} AS available
            FROM experiences
            WHERE id = ? AND published = 1`,
         )

@@ -10,14 +10,14 @@ Marketplace de experiencias en vehículos de lujo (jets privados, yates y autoca
 
 ## Equipo
 
-| Persona | GitHub | Rol Scrum | Rol técnico (Sprint 0) | Rol técnico (Sprint 1) |
-| --- | --- | --- | --- | --- |
-| Alba Cano Iglesias | `albacano` | Product Owner | Frontend | Backend |
-| Roger Ayala | `RogerAyala` | Scrum Master | Backend | Frontend |
-| Adam El Messaoudi Aarab | `mimissuri` | — | DevOps | Frontend |
-| Ignacio Martínez Allué | `igna-mtz` | — | Backend | DevOps |
-| Fedor Gorshkov | `fedorgor133` | — | Frontend | QA |
-| Muqaddam Ahmad Mehmood Ashraf | `Aduhax16` | — | QA | Backend |
+| Persona | GitHub | Rol Scrum (Sprint 0 y 1) | Rol Scrum (Sprint 2) | Rol técnico (Sprint 0) | Rol técnico (Sprint 1) | Rol técnico (Sprint 2) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Alba Cano Iglesias | `albacano` | Product Owner | — | Frontend | Backend | QA |
+| Roger Ayala | `RogerAyala` | Scrum Master | — | Backend | Frontend | DevOps |
+| Adam El Messaoudi Aarab | `mimissuri` | — | — | DevOps | Frontend | Backend |
+| Ignacio Martínez Allué | `igna-mtz` | — | Scrum Master | Backend | DevOps | Frontend |
+| Fedor Gorshkov | `fedorgor133` | — | — | Frontend | QA | Frontend |
+| Muqaddam Ahmad Mehmood Ashraf | `Aduhax16` | — | Product Owner | QA | Backend | Backend |
 
 - **Product Owner:** escribe las user stories en Trello (con criterios de aceptación), crea las issues en GitHub y acepta lo terminado.
 - **Scrum Master:** coordina el equipo, lleva el Excel del sprint y vigila que Trello, issues y Excel cuadren.
@@ -57,8 +57,28 @@ En local, D1 se simula en `apps/api/.wrangler/`: no hace falta cuenta de Cloudfl
 | `pnpm lint` / `pnpm format` | Biome (lint + formato) |
 | `pnpm typecheck` | TypeScript en todos los paquetes |
 | `pnpm test` | Tests (la API usa Vitest dentro del runtime de Workers) |
+| `pnpm acceptance` | Tests de aceptación con Playwright contra dev (ver [Tests de aceptación](#tests-de-aceptación-tr-009)) |
 | `pnpm build` | Build del front |
 | `pnpm db:new <nombre>` | Crea una migración D1 en `apps/api/migrations/` |
+
+## Tests de aceptación (TR-009)
+
+`apps/acceptance` tiene **un test por criterio de aceptación** de cada user story, con la historia y el criterio en el título (`US-018 · C2 · …`). Se ejecutan con Playwright contra un entorno desplegado, por defecto dev, y su resultado (PASS o FAIL) es el que QA anota en la tarjeta de Trello.
+
+```bash
+pnpm --filter @luxydrive/acceptance exec playwright install chromium   # solo la primera vez
+pnpm acceptance                                                        # contra dev
+pnpm acceptance us-018                                                 # solo una historia
+ACCEPTANCE_BASE_URL=http://localhost:8787 pnpm acceptance              # contra `pnpm dev`
+```
+
+También desde Actions → **Acceptance tests** (manual, contra dev o staging): el resultado por criterio queda en el log y el informe HTML, como artefacto.
+
+- **No bloquean las PRs.** No forman parte de `pnpm test` ni de la CI: dev es un entorno compartido y un fallo allí puede venir de otra PR. Lo que bloquea sigue siendo la CI.
+- **Cada test crea sus datos** por la API (cuentas `qa-…@luxydrive.test` y anuncios `QA · …`), así que no depende del seed ni del orden, y retira sus anuncios al terminar.
+- **Nunca contra producción:** la configuración lo rechaza.
+- **API antes que pantalla.** Si el criterio es una regla («no puede retirar el anuncio de otro»), el test llama a la API; el navegador solo se usa cuando el criterio habla de lo que ve la persona. Las variantes y los casos de error de cada endpoint siguen en `apps/api/test/`.
+- Para una historia nueva: `apps/acceptance/tests/us-0XX.spec.ts`, con los helpers de `support/actors.ts`.
 
 ## Estrategia de ramas
 
@@ -125,6 +145,7 @@ Una tarea solo pasa a Done cuando cumple todo esto. La [plantilla de PR](.github
 - La CI aplica las migraciones pendientes antes de cada despliegue.
 - **Nunca edites una migración ya mergeada**: crea una nueva con `pnpm db:new`.
 - En dev las migraciones de PRs se acumulan (aunque la PR se cierre). Si dev queda inconsistente: Actions → **Reset dev DB** → escribe `reset-dev`. Borra las tablas de dev, reaplica las migraciones y carga `apps/api/seed/dev.sql` si existe.
+- **Datos de demo en staging (TR-005):** Actions → **Seed staging** → escribe `seed-staging`. Primero comprueba el secret y espera a que no haya un deploy de staging en marcha; después registra por la API el proveedor de demo `proveedor.demo@luxydrive.test` (si ya existe, hace login y falla si la contraseña no es la del secret o la cuenta no es de proveedor) y, solo entonces, carga `apps/api/seed/staging.sql`: las mismas experiencias que dev (tres categorías, con ofertas activas), todas de ese proveedor, más su perfil. **Solo toca lo del proveedor de demo:** cada ejecución borra y vuelve a crear sus anuncios, y con ellos las reservas hechas sobre esos anuncios. Los anuncios, borradores y reservas de cualquier otra cuenta no cambian. Se puede repetir sin duplicar datos. La contraseña está en el secret `DEMO_PROVIDER_PASSWORD` del entorno `staging` (pídesela a DevOps). Producción nunca recibe datos de demo: el workflow solo apunta a staging.
 
 ### Modelo mínimo de experiencias (SP-001.a)
 
@@ -363,7 +384,7 @@ sesión, `403` a una cuenta de cliente). Las escrituras exigen el `Origin` propi
 | `POST /api/provider/experiences` con al menos `title` | `201` con el borrador |
 | `GET /api/provider/experiences` | `200` con los anuncios propios (borradores y publicados), del más nuevo al más antiguo |
 | `GET /api/provider/experiences/:id` | `200` con el anuncio propio; `403 forbidden` si es de otro proveedor; `404 not_found` si no existe |
-| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el borrador actualizado; `403` si es de otro; `409 already_published` si ya está publicado |
+| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el anuncio actualizado (borrador o publicado, ver US-013.b); `403` si es de otro; `409 already_withdrawn` si está retirado; `409 offer_active` si cambia el precio con una oferta especial |
 
 Campos: `title` (obligatorio, hasta 120 caracteres), y opcionales `description`,
 `category` (`jet`, `yacht` o `camper`), `vehicle`, `location` y `capacity` (entero
@@ -419,6 +440,82 @@ catálogo y el detalle: `description`, `category`, `vehicle`, `location` y `capa
 `fields` los lista todos, con el precio y la fecha primero. Si no se publica, el anuncio
 sigue siendo un borrador oculto.
 
+### Corregir un anuncio publicado (US-013.b)
+
+`PATCH /api/provider/experiences/:id` también corrige un anuncio propio **ya publicado**,
+con los mismos campos y validaciones que el borrador (US-009.b y US-011.b). Antes respondía
+`409 already_published`. El cambio se ve enseguida en el catálogo, las ofertas y el detalle.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Cambio válido | `200` | El anuncio con `status: "published"` |
+| Deja vacío un campo de texto que el catálogo necesita (`description`, `vehicle`, `location`) | `400` | `{ "error": "missing_fields", "fields": [...] }` |
+| Fecha y hora ya pasadas | `400` | `{ "error": "service_at_in_past" }` |
+| Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` (no cambia) |
+| Anuncio retirado (US-014.b) | `409` | `{ "error": "already_withdrawn" }` (no cambia) |
+| Otro precio con una oferta especial sin terminar (US-016.b) | `409` | `{ "error": "offer_active" }` (no cambia) |
+| El anuncio se retira o recibe una oferta mientras se guarda | `409` | `{ "error": "listing_changed" }` (no cambia) |
+
+Si cambia `serviceAt`, la oferta se ajusta para que siga siendo coherente: una oferta
+`standard` dura hasta la nueva fecha de servicio, y una oferta especial (`last_minute` o
+`empty_leg`) nunca termina después del servicio. Si no se guarda, no cambia ningún campo.
+
+El precio no se cambia mientras el anuncio tiene una oferta especial, en curso o caducada:
+primero se termina con `DELETE /api/provider/experiences/:id/offer` (US-016.b), que devuelve
+el precio normal. Los demás campos sí se corrigen durante la oferta.
+
+### Retirar un anuncio publicado (US-014.b)
+
+`POST /api/provider/experiences/:id/withdraw` deja de ofrecer un anuncio publicado propio.
+El anuncio no se borra: queda con la oferta inactiva y deja de estar **disponible**
+(definición de US-001), así que desaparece de `GET /api/experiences` y de `GET /api/offers`,
+y su detalle responde `410 not_available`. En `GET /api/provider/experiences[/:id]` aparece
+con `status: "withdrawn"` (los otros estados son `draft` y `published`).
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Anuncio propio publicado | `200` | El anuncio con `status: "withdrawn"` |
+| Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` (sigue disponible) |
+| Es un borrador | `409` | `{ "error": "not_published" }` |
+| Ya estaba retirado | `409` | `{ "error": "already_withdrawn" }` |
+| No existe | `404` | `{ "error": "not_found" }` |
+| `id` no válido | `400` | `{ "error": "invalid_id" }` |
+
+En la base de datos, `withdrawn_at` (migración `experience_withdrawn_at`, segundos Unix UTC)
+guarda cuándo se retiró; `NULL` significa que no está retirado. Desde el frontend:
+`client.api.provider.experiences[":id"].withdraw.$post({ param: { id: "1" } })`.
+
+### Ofertas especiales de un anuncio propio (US-016.b)
+
+Un proveedor rebaja un anuncio publicado propio con una oferta flash (`last_minute`) o
+empty-leg, que aparece en `GET /api/offers` (JS-001) con su precio, el precio de antes y su
+vigencia. Un anuncio tiene una sola oferta a la vez.
+
+`POST /api/provider/experiences/:id/offer` con
+`{ "type": "last_minute" | "empty_leg", "price": 650.5, "until": "2030-06-14T20:00" }`.
+`price` es el precio rebajado en EUR por la experiencia completa y `until`, el fin de la
+oferta en hora de Madrid (formato de `<input type="datetime-local">`). Responde `201` con
+`{ id, offerType, price, originalPrice, currency, priceUnit, offerExpiresAt }`.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Precio igual o mayor que el normal | `400` | `{ "error": "price_not_lower" }` |
+| `until` ya ha pasado | `400` | `{ "error": "until_in_past" }` |
+| `until` después de la fecha de servicio | `400` | `{ "error": "until_after_service" }` |
+| Campo no válido | `400` | `invalid_offer_type`, `invalid_price` o `invalid_until` |
+| Ya hay una oferta especial en curso | `409` | `{ "error": "offer_active" }` (no quedan dos precios) |
+| Borrador, anuncio retirado o servicio pasado | `409` | `{ "error": "not_available" }` |
+| Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` |
+
+`DELETE /api/provider/experiences/:id/offer` termina la oferta especial y devuelve el
+anuncio a su precio normal hasta la fecha de servicio (`200` con la oferta `standard`).
+Sirve también para una oferta ya caducada: al caducar, el anuncio deja de estar disponible
+(definición de US-001) hasta que se termina la oferta o se lanza otra. Sin oferta especial
+responde `409 no_active_offer`.
+
+En la base de datos se reutilizan las columnas de JS-001: `offer_type`, `price_cents`
+(precio rebajado), `original_price_cents` (precio normal) y `offer_expires_at`.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
@@ -429,6 +526,8 @@ Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudfl
   32 bytes y distinto en cada entorno (SP-002). Sin él, registro y login responden `500`. Lo
   configura DevOps con `wrangler secret put AUTH_PEPPER --env <entorno>`; en local va en
   `apps/api/.dev.vars` (`AUTH_PEPPER=...`).
+- Secret `DEMO_PROVIDER_PASSWORD` en el entorno `staging` de GitHub: contraseña del proveedor de demo
+  (mínimo 8 caracteres). Solo lo usa el workflow **Seed staging**.
 - Configuración de los tres entornos: `apps/api/wrangler.jsonc`.
 
 | Workflow | Disparador |
@@ -440,6 +539,12 @@ Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudfl
 | `main-guard.yml` | PR contra `main` |
 | `back-merge.yml` | push a `main` |
 | `reset-dev-db.yml` | manual |
+| `seed-staging.yml` | manual |
+| `acceptance.yml` | manual |
+
+Después de cada despliegue (dev, staging y producción), la acción `.github/actions/deploy` llama a
+`/api/health` del entorno y el job falla si no responde `200` tras 5 intentos (TR-006). El error
+aparece en la pestaña Actions con el nombre del entorno: `Health check (<entorno>)`.
 
 ## SP-002: autenticación y roles (Sprint 1)
 
@@ -514,3 +619,157 @@ No añade endpoints ni migraciones por sí sola.
 - Tests de implementación: registro válido/duplicado/campos, credenciales erróneas,
   sesión ausente/vencida/revocada, separación client/provider, propiedad de recursos
   y Origin incorrecto. Las migraciones serán nuevas y compatibles con el despliegue.
+
+## SP-003: estados y reglas de una reserva (Sprint 2)
+
+Decisión de diseño para #93. La implementación corresponde a #106 (solicitar,
+US-018.b), #109 (resolver, US-020.b) y #112 (mis reservas, US-019.b). En Sprint 2 una
+reserva es una **reserva privada completa** (EP-004): un único cliente se queda la
+experiencia entera, sea cual sea su capacidad. Las experiencias compartidas son EP-015.
+
+### Estados y transiciones
+
+| Estado | Significa | Quién llega a él |
+| --- | --- | --- |
+| `pending` | Solicitud enviada, esperando al proveedor | El cliente, al solicitar |
+| `confirmed` | El proveedor la ha aceptado: la experiencia es de ese cliente | El proveedor dueño del anuncio |
+| `rejected` | El proveedor la ha rechazado, o ha confirmado otra | El proveedor dueño del anuncio, o el sistema al confirmar otra |
+
+- Solo se pasa de `pending` a `confirmed` o a `rejected`. `confirmed` y `rejected` son
+  finales en este sprint: anular una reserva es US-026 y el pago es US-021.
+- Resolver una solicitud que ya no está pendiente responde `409 already_resolved`, sin
+  cambiar nada. Así, dos decisiones a la vez nunca se pisan.
+
+### Disponibilidad y competencia entre solicitudes
+
+- Se puede solicitar una experiencia **disponible**: la definición de US-001 (publicada,
+  oferta activa y sin caducar, servicio futuro) y, además, **sin reserva confirmada**.
+  El catálogo, las ofertas y el detalle usan esa misma definición: una experiencia
+  confirmada desaparece del catálogo y su detalle responde `410 not_available`.
+- Varias solicitudes pendientes pueden convivir sobre la misma experiencia: el
+  proveedor elige. Un mismo cliente solo puede tener una pendiente por experiencia
+  (`409 already_requested`). Tras un rechazo puede volver a solicitar mientras siga
+  disponible.
+- Al confirmar una solicitud, en la misma transacción (`DB.batch`) se rechazan las
+  demás pendientes de esa experiencia. Esas solicitudes pasan a `rejected` y su cliente
+  lo ve en sus reservas.
+- **Solo una confirmada por experiencia**: lo garantiza la base de datos con un índice
+  único parcial (`experience_id` donde `status = 'confirmed'`), no solo la API. Si dos
+  confirmaciones compiten, la segunda falla y responde `409`.
+- El proveedor solo puede confirmar mientras la experiencia sigue disponible (si el
+  servicio ya pasó, la oferta caducó o la retiró con US-014, responde
+  `409 not_available`). Rechazar una pendiente siempre está permitido.
+
+### Qué se guarda
+
+Tabla `reservations` (migración nueva):
+
+- `id`, `experience_id` (FK a `experiences`) y `client_id` (FK a `users`), ambas con
+  `ON DELETE CASCADE`.
+- `status`, restringido a `pending`, `confirmed` o `rejected`.
+- `price_cents`: el precio de la experiencia **en el momento de solicitar**. US-013
+  permite corregir un anuncio publicado, y el cliente ha pedido a un precio concreto.
+  La fecha de servicio, en cambio, se lee siempre del anuncio.
+- `created_at` y `decided_at`, en segundos Unix UTC (`decided_at` es `NULL` mientras
+  está pendiente).
+
+### Rutas y protección
+
+| Ruta | Quién | Historia |
+| --- | --- | --- |
+| `POST /api/reservations` con `{ "experienceId": 7 }` | Cliente | US-018.b |
+| `GET /api/reservations` | Cliente: solo las suyas | US-019.b |
+| `GET /api/provider/reservations` | Proveedor: solo las de sus anuncios | US-020.b |
+| `PATCH /api/provider/reservations/:id` con `{ "status": "confirmed" }` o `"rejected"` | Proveedor dueño del anuncio | US-020.b |
+
+- Se aplican las reglas de SP-002: sin sesión `401 unauthorized`; con el rol equivocado
+  `403 forbidden` (un proveedor no puede solicitar, un cliente no puede resolver); las
+  escrituras exigen el mismo `Origin`.
+- La propiedad se comprueba en SQL: `client_id` es siempre el de la sesión, nunca un
+  campo de la petición, y el proveedor se comprueba con `experiences.provider_id`.
+  Resolver una solicitud del anuncio de otro proveedor responde `403 forbidden` y no
+  cambia su estado.
+- Solicitar algo que no existe o que no está publicado responde `404 not_found` (igual
+  que el detalle, para no revelar borradores). Si está publicado pero ya no está
+  disponible, `410 not_available`.
+- Cada solicitud se devuelve con `id`, `experienceId`, `experienceTitle`, `serviceAt`
+  (ISO 8601 UTC), `price`, `currency`, `status` y `createdAt`; al proveedor se le añade
+  `clientName`. Nunca se devuelve el email del cliente.
+
+## API de reservas (Sprint 2)
+
+Implementación de SP-003. Las reglas completas están en la sección anterior.
+
+### Solicitar una reserva (US-018.b)
+
+`POST /api/reservations` con `{ "experienceId": 7 }` crea una solicitud de reserva del
+cliente de la sesión, con las reglas de SP-003 (#93). Desde el frontend:
+`client.api.reservations.$post({ json: { experienceId } })`. Responde `201` con:
+
+```json
+{
+  "id": 12,
+  "experienceId": 7,
+  "experienceTitle": "Velero en Palma",
+  "serviceAt": "2026-12-05T17:30:00.000Z",
+  "price": 900,
+  "currency": "EUR",
+  "status": "pending",
+  "createdAt": "2026-11-24T19:00:00.000Z"
+}
+```
+
+`price` es el precio en el momento de solicitar; se guarda en `reservations.price_cents`.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Sin sesión | `401` | `{ "error": "unauthorized" }` |
+| Sesión de proveedor, u `Origin` distinto | `403` | `{ "error": "forbidden" }` / `{ "error": "invalid_origin" }` |
+| `experienceId` no es un entero positivo | `400` | `{ "error": "invalid_experience_id" }` |
+| No existe o es un borrador | `404` | `{ "error": "not_found" }` |
+| Publicada pero no disponible (oferta caducada o retirada, servicio pasado o ya reservada) | `410` | `{ "error": "not_available" }` |
+| El cliente ya tiene una solicitud pendiente de esa experiencia | `409` | `{ "error": "already_requested" }` |
+
+"Disponible" es la definición de US-001 más **sin reserva confirmada**: una experiencia
+reservada sale del catálogo y de las ofertas, y su detalle responde `410`. La base de datos
+impide dos reservas confirmadas para la misma experiencia (índice único parcial).
+
+### Mis reservas (US-019.b)
+
+`GET /api/reservations` devuelve las solicitudes del cliente de la sesión, primero las de
+servicio más próximo, con su estado actual (`pending`, `confirmed` o `rejected`). Desde el
+frontend: `client.api.reservations.$get()`. Responde `200` con una lista (vacía si no tiene
+ninguna) de objetos con la misma forma que `POST /api/reservations`. Nunca incluye
+solicitudes de otros clientes ni el email del cliente.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Sin sesión | `401` | `{ "error": "unauthorized" }` |
+| Sesión de proveedor | `403` | `{ "error": "forbidden" }` |
+
+### Resolver solicitudes de reserva (US-020.b)
+
+Rutas de proveedor, con las reglas de SP-003 (#93):
+
+- `GET /api/provider/reservations` devuelve las solicitudes de **sus** anuncios, de la más
+  nueva a la más antigua, con el mismo objeto que US-018.b más `clientName`.
+- `PATCH /api/provider/reservations/:id` con `{ "status": "confirmed" }` o
+  `{ "status": "rejected" }` resuelve una solicitud pendiente y devuelve la solicitud
+  actualizada. Confirmar rechaza en la misma transacción las demás pendientes de esa
+  experiencia, que deja de estar disponible. El cliente ve el estado nuevo en sus reservas.
+
+Desde el frontend: `client.api.provider.reservations.$get()` y
+`client.api.provider.reservations[":id"].$patch({ param: { id }, json: { status } })`.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Sin sesión | `401` | `{ "error": "unauthorized" }` |
+| Sesión de cliente, u `Origin` distinto | `403` | `{ "error": "forbidden" }` / `{ "error": "invalid_origin" }` |
+| Solicitud sobre el anuncio de otro proveedor (no cambia nada) | `403` | `{ "error": "forbidden" }` |
+| `id` no es un entero positivo | `400` | `{ "error": "invalid_id" }` |
+| `status` distinto de `confirmed` o `rejected` | `400` | `{ "error": "invalid_status" }` |
+| La solicitud no existe | `404` | `{ "error": "not_found" }` |
+| Ya no está pendiente (incluido rechazada al confirmar otra) | `409` | `{ "error": "already_resolved" }` |
+| Confirmar cuando la experiencia ya no está disponible | `409` | `{ "error": "not_available" }` |
+
+Rechazar una solicitud pendiente siempre está permitido.

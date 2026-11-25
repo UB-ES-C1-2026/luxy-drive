@@ -8,7 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "echo \"ui: sin tests todavía\""
+    "test": "vitest run"
   },
   "peerDependencies": {
     "react": "^19"
@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@types/react": "19.3.0",
-    "react": "19.3.1"
+    "react": "19.3.1",
+    "vitest": "4.1.12"
   }
 }

@@ -110,7 +110,7 @@ export function ListingCard({
 
       <div className="flex flex-col gap-0.5">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-title-md text-ink">
+          <h3 className="min-w-0 break-words text-title-md text-ink">
             {href ? (
               // El enlace cubre toda la tarjeta; el corazón queda por encima (z-10).
               <a href={href} className={cx("rounded-sm after:absolute after:inset-0", focusRing)}>
@@ -122,7 +122,7 @@ export function ListingCard({
           </h3>
           {rating !== undefined && <Rating value={rating} reviewCount={reviewCount} />}
         </div>
-        <p className="text-body-sm text-muted">{location}</p>
+        <p className="break-words text-body-sm text-muted">{location}</p>
         {dates && <p className="text-body-sm text-muted">{dates}</p>}
         <p className="mt-1 text-body-sm text-ink">
           {originalPrice !== undefined && (

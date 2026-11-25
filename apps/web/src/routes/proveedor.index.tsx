@@ -31,6 +31,12 @@ export const Route = createFileRoute("/proveedor/")({
 const PageButton = createLink(ButtonLink);
 const ListingLink = createLink(TextLink);
 
+const statusLabel = {
+  draft: "Borrador",
+  published: "Publicado",
+  withdrawn: "Retirado",
+};
+
 function ProviderHome() {
   const user = useSessionUser();
   const listings = Route.useLoaderData();
@@ -57,6 +63,9 @@ function ProviderHome() {
         <ButtonLink href="/proveedor/perfil" variant="secondary">
           Perfil de empresa
         </ButtonLink>
+        <PageButton to="/proveedor/solicitudes" variant="secondary">
+          Solicitudes recibidas
+        </PageButton>
         <PageButton to="/proveedor/anuncios/nuevo">
           <Plus aria-hidden className="size-4" />
           Nuevo anuncio
@@ -95,9 +104,9 @@ function ProviderHome() {
                 <Text
                   as="span"
                   variant="body-sm"
-                  tone={listing.status === "draft" ? "muted" : "ink"}
+                  tone={listing.status === "published" ? "ink" : "muted"}
                 >
-                  {listing.status === "draft" ? "Borrador" : "Publicado"}
+                  {statusLabel[listing.status]}
                 </Text>
               </li>
             ))}
