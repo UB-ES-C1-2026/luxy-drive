@@ -31,6 +31,12 @@ export const Route = createFileRoute("/proveedor/")({
 const PageButton = createLink(ButtonLink);
 const ListingLink = createLink(TextLink);
 
+const statusLabel = {
+  draft: "Borrador",
+  published: "Publicado",
+  withdrawn: "Retirado",
+};
+
 function ProviderHome() {
   const user = useSessionUser();
   const listings = Route.useLoaderData();
@@ -98,9 +104,9 @@ function ProviderHome() {
                 <Text
                   as="span"
                   variant="body-sm"
-                  tone={listing.status === "draft" ? "muted" : "ink"}
+                  tone={listing.status === "published" ? "ink" : "muted"}
                 >
-                  {listing.status === "draft" ? "Borrador" : "Publicado"}
+                  {statusLabel[listing.status]}
                 </Text>
               </li>
             ))}

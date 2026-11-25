@@ -10,14 +10,14 @@ Marketplace de experiencias en vehículos de lujo (jets privados, yates y autoca
 
 ## Equipo
 
-| Persona | GitHub | Rol Scrum | Rol técnico (Sprint 0) | Rol técnico (Sprint 1) |
-| --- | --- | --- | --- | --- |
-| Alba Cano Iglesias | `albacano` | Product Owner | Frontend | Backend |
-| Roger Ayala | `RogerAyala` | Scrum Master | Backend | Frontend |
-| Adam El Messaoudi Aarab | `mimissuri` | — | DevOps | Frontend |
-| Ignacio Martínez Allué | `igna-mtz` | — | Backend | DevOps |
-| Fedor Gorshkov | `fedorgor133` | — | Frontend | QA |
-| Muqaddam Ahmad Mehmood Ashraf | `Aduhax16` | — | QA | Backend |
+| Persona | GitHub | Rol Scrum (Sprint 0 y 1) | Rol Scrum (Sprint 2) | Rol técnico (Sprint 0) | Rol técnico (Sprint 1) | Rol técnico (Sprint 2) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Alba Cano Iglesias | `albacano` | Product Owner | — | Frontend | Backend | QA |
+| Roger Ayala | `RogerAyala` | Scrum Master | — | Backend | Frontend | DevOps |
+| Adam El Messaoudi Aarab | `mimissuri` | — | — | DevOps | Frontend | Backend |
+| Ignacio Martínez Allué | `igna-mtz` | — | Scrum Master | Backend | DevOps | Frontend |
+| Fedor Gorshkov | `fedorgor133` | — | — | Frontend | QA | Frontend |
+| Muqaddam Ahmad Mehmood Ashraf | `Aduhax16` | — | Product Owner | QA | Backend | Backend |
 
 - **Product Owner:** escribe las user stories en Trello (con criterios de aceptación), crea las issues en GitHub y acepta lo terminado.
 - **Scrum Master:** coordina el equipo, lleva el Excel del sprint y vigila que Trello, issues y Excel cuadren.
@@ -57,8 +57,28 @@ En local, D1 se simula en `apps/api/.wrangler/`: no hace falta cuenta de Cloudfl
 | `pnpm lint` / `pnpm format` | Biome (lint + formato) |
 | `pnpm typecheck` | TypeScript en todos los paquetes |
 | `pnpm test` | Tests (la API usa Vitest dentro del runtime de Workers) |
+| `pnpm acceptance` | Tests de aceptación con Playwright contra dev (ver [Tests de aceptación](#tests-de-aceptación-tr-009)) |
 | `pnpm build` | Build del front |
 | `pnpm db:new <nombre>` | Crea una migración D1 en `apps/api/migrations/` |
+
+## Tests de aceptación (TR-009)
+
+`apps/acceptance` tiene **un test por criterio de aceptación** de cada user story, con la historia y el criterio en el título (`US-018 · C2 · …`). Se ejecutan con Playwright contra un entorno desplegado, por defecto dev, y su resultado (PASS o FAIL) es el que QA anota en la tarjeta de Trello.
+
+```bash
+pnpm --filter @luxydrive/acceptance exec playwright install chromium   # solo la primera vez
+pnpm acceptance                                                        # contra dev
+pnpm acceptance us-018                                                 # solo una historia
+ACCEPTANCE_BASE_URL=http://localhost:8787 pnpm acceptance              # contra `pnpm dev`
+```
+
+También desde Actions → **Acceptance tests** (manual, contra dev o staging): el resultado por criterio queda en el log y el informe HTML, como artefacto.
+
+- **No bloquean las PRs.** No forman parte de `pnpm test` ni de la CI: dev es un entorno compartido y un fallo allí puede venir de otra PR. Lo que bloquea sigue siendo la CI.
+- **Cada test crea sus datos** por la API (cuentas `qa-…@luxydrive.test` y anuncios `QA · …`), así que no depende del seed ni del orden, y retira sus anuncios al terminar.
+- **Nunca contra producción:** la configuración lo rechaza.
+- **API antes que pantalla.** Si el criterio es una regla («no puede retirar el anuncio de otro»), el test llama a la API; el navegador solo se usa cuando el criterio habla de lo que ve la persona. Las variantes y los casos de error de cada endpoint siguen en `apps/api/test/`.
+- Para una historia nueva: `apps/acceptance/tests/us-0XX.spec.ts`, con los helpers de `support/actors.ts`.
 
 ## Estrategia de ramas
 
@@ -125,6 +145,7 @@ Una tarea solo pasa a Done cuando cumple todo esto. La [plantilla de PR](.github
 - La CI aplica las migraciones pendientes antes de cada despliegue.
 - **Nunca edites una migración ya mergeada**: crea una nueva con `pnpm db:new`.
 - En dev las migraciones de PRs se acumulan (aunque la PR se cierre). Si dev queda inconsistente: Actions → **Reset dev DB** → escribe `reset-dev`. Borra las tablas de dev, reaplica las migraciones y carga `apps/api/seed/dev.sql` si existe.
+- **Datos de demo en staging (TR-005):** Actions → **Seed staging** → escribe `seed-staging`. Primero comprueba el secret y espera a que no haya un deploy de staging en marcha; después registra por la API el proveedor de demo `proveedor.demo@luxydrive.test` (si ya existe, hace login y falla si la contraseña no es la del secret o la cuenta no es de proveedor) y, solo entonces, carga `apps/api/seed/staging.sql`: las mismas experiencias que dev (tres categorías, con ofertas activas), todas de ese proveedor, más su perfil. **Solo toca lo del proveedor de demo:** cada ejecución borra y vuelve a crear sus anuncios, y con ellos las reservas hechas sobre esos anuncios. Los anuncios, borradores y reservas de cualquier otra cuenta no cambian. Se puede repetir sin duplicar datos. La contraseña está en el secret `DEMO_PROVIDER_PASSWORD` del entorno `staging` (pídesela a DevOps). Producción nunca recibe datos de demo: el workflow solo apunta a staging.
 
 ### Modelo mínimo de experiencias (SP-001.a)
 
@@ -363,7 +384,7 @@ sesión, `403` a una cuenta de cliente). Las escrituras exigen el `Origin` propi
 | `POST /api/provider/experiences` con al menos `title` | `201` con el borrador |
 | `GET /api/provider/experiences` | `200` con los anuncios propios (borradores y publicados), del más nuevo al más antiguo |
 | `GET /api/provider/experiences/:id` | `200` con el anuncio propio; `403 forbidden` si es de otro proveedor; `404 not_found` si no existe |
-| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el borrador actualizado; `403` si es de otro; `409 already_published` si ya está publicado |
+| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el anuncio actualizado (borrador o publicado, ver US-013.b); `403` si es de otro; `409 already_withdrawn` si está retirado; `409 offer_active` si cambia el precio con una oferta especial |
 
 Campos: `title` (obligatorio, hasta 120 caracteres), y opcionales `description`,
 `category` (`jet`, `yacht` o `camper`), `vehicle`, `location` y `capacity` (entero
@@ -419,6 +440,82 @@ catálogo y el detalle: `description`, `category`, `vehicle`, `location` y `capa
 `fields` los lista todos, con el precio y la fecha primero. Si no se publica, el anuncio
 sigue siendo un borrador oculto.
 
+### Corregir un anuncio publicado (US-013.b)
+
+`PATCH /api/provider/experiences/:id` también corrige un anuncio propio **ya publicado**,
+con los mismos campos y validaciones que el borrador (US-009.b y US-011.b). Antes respondía
+`409 already_published`. El cambio se ve enseguida en el catálogo, las ofertas y el detalle.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Cambio válido | `200` | El anuncio con `status: "published"` |
+| Deja vacío un campo de texto que el catálogo necesita (`description`, `vehicle`, `location`) | `400` | `{ "error": "missing_fields", "fields": [...] }` |
+| Fecha y hora ya pasadas | `400` | `{ "error": "service_at_in_past" }` |
+| Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` (no cambia) |
+| Anuncio retirado (US-014.b) | `409` | `{ "error": "already_withdrawn" }` (no cambia) |
+| Otro precio con una oferta especial sin terminar (US-016.b) | `409` | `{ "error": "offer_active" }` (no cambia) |
+| El anuncio se retira o recibe una oferta mientras se guarda | `409` | `{ "error": "listing_changed" }` (no cambia) |
+
+Si cambia `serviceAt`, la oferta se ajusta para que siga siendo coherente: una oferta
+`standard` dura hasta la nueva fecha de servicio, y una oferta especial (`last_minute` o
+`empty_leg`) nunca termina después del servicio. Si no se guarda, no cambia ningún campo.
+
+El precio no se cambia mientras el anuncio tiene una oferta especial, en curso o caducada:
+primero se termina con `DELETE /api/provider/experiences/:id/offer` (US-016.b), que devuelve
+el precio normal. Los demás campos sí se corrigen durante la oferta.
+
+### Retirar un anuncio publicado (US-014.b)
+
+`POST /api/provider/experiences/:id/withdraw` deja de ofrecer un anuncio publicado propio.
+El anuncio no se borra: queda con la oferta inactiva y deja de estar **disponible**
+(definición de US-001), así que desaparece de `GET /api/experiences` y de `GET /api/offers`,
+y su detalle responde `410 not_available`. En `GET /api/provider/experiences[/:id]` aparece
+con `status: "withdrawn"` (los otros estados son `draft` y `published`).
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Anuncio propio publicado | `200` | El anuncio con `status: "withdrawn"` |
+| Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` (sigue disponible) |
+| Es un borrador | `409` | `{ "error": "not_published" }` |
+| Ya estaba retirado | `409` | `{ "error": "already_withdrawn" }` |
+| No existe | `404` | `{ "error": "not_found" }` |
+| `id` no válido | `400` | `{ "error": "invalid_id" }` |
+
+En la base de datos, `withdrawn_at` (migración `experience_withdrawn_at`, segundos Unix UTC)
+guarda cuándo se retiró; `NULL` significa que no está retirado. Desde el frontend:
+`client.api.provider.experiences[":id"].withdraw.$post({ param: { id: "1" } })`.
+
+### Ofertas especiales de un anuncio propio (US-016.b)
+
+Un proveedor rebaja un anuncio publicado propio con una oferta flash (`last_minute`) o
+empty-leg, que aparece en `GET /api/offers` (JS-001) con su precio, el precio de antes y su
+vigencia. Un anuncio tiene una sola oferta a la vez.
+
+`POST /api/provider/experiences/:id/offer` con
+`{ "type": "last_minute" | "empty_leg", "price": 650.5, "until": "2030-06-14T20:00" }`.
+`price` es el precio rebajado en EUR por la experiencia completa y `until`, el fin de la
+oferta en hora de Madrid (formato de `<input type="datetime-local">`). Responde `201` con
+`{ id, offerType, price, originalPrice, currency, priceUnit, offerExpiresAt }`.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Precio igual o mayor que el normal | `400` | `{ "error": "price_not_lower" }` |
+| `until` ya ha pasado | `400` | `{ "error": "until_in_past" }` |
+| `until` después de la fecha de servicio | `400` | `{ "error": "until_after_service" }` |
+| Campo no válido | `400` | `invalid_offer_type`, `invalid_price` o `invalid_until` |
+| Ya hay una oferta especial en curso | `409` | `{ "error": "offer_active" }` (no quedan dos precios) |
+| Borrador, anuncio retirado o servicio pasado | `409` | `{ "error": "not_available" }` |
+| Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` |
+
+`DELETE /api/provider/experiences/:id/offer` termina la oferta especial y devuelve el
+anuncio a su precio normal hasta la fecha de servicio (`200` con la oferta `standard`).
+Sirve también para una oferta ya caducada: al caducar, el anuncio deja de estar disponible
+(definición de US-001) hasta que se termina la oferta o se lanza otra. Sin oferta especial
+responde `409 no_active_offer`.
+
+En la base de datos se reutilizan las columnas de JS-001: `offer_type`, `price_cents`
+(precio rebajado), `original_price_cents` (precio normal) y `offer_expires_at`.
+
 ## Despliegue y credenciales
 
 Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudflare para desarrollar.
@@ -429,6 +526,8 @@ Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudfl
   32 bytes y distinto en cada entorno (SP-002). Sin él, registro y login responden `500`. Lo
   configura DevOps con `wrangler secret put AUTH_PEPPER --env <entorno>`; en local va en
   `apps/api/.dev.vars` (`AUTH_PEPPER=...`).
+- Secret `DEMO_PROVIDER_PASSWORD` en el entorno `staging` de GitHub: contraseña del proveedor de demo
+  (mínimo 8 caracteres). Solo lo usa el workflow **Seed staging**.
 - Configuración de los tres entornos: `apps/api/wrangler.jsonc`.
 
 | Workflow | Disparador |
@@ -440,6 +539,12 @@ Los despliegues los hace siempre GitHub Actions; nadie necesita acceso a Cloudfl
 | `main-guard.yml` | PR contra `main` |
 | `back-merge.yml` | push a `main` |
 | `reset-dev-db.yml` | manual |
+| `seed-staging.yml` | manual |
+| `acceptance.yml` | manual |
+
+Después de cada despliegue (dev, staging y producción), la acción `.github/actions/deploy` llama a
+`/api/health` del entorno y el job falla si no responde `200` tras 5 intentos (TR-006). El error
+aparece en la pestaña Actions con el nombre del entorno: `Health check (<entorno>)`.
 
 ## SP-002: autenticación y roles (Sprint 1)
 

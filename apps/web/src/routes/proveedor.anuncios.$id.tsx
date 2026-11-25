@@ -16,12 +16,17 @@ import { client } from "../api";
 import { type Draft, DraftStep, steps } from "../draft-wizard";
 import { ProviderOnly, ProviderPage, requireSession } from "../provider-page";
 import { useSessionUser } from "../session";
+import { WithdrawListing } from "../withdraw-listing";
 
 export const Route = createFileRoute("/proveedor/anuncios/$id")({
   // Sin `paso` se ve el resumen del anuncio; con `paso`, esa pregunta.
-  validateSearch: (search: Record<string, unknown>): { paso?: number } => {
+  // `guardado` avisa en el resumen de que se acaba de corregir un anuncio publicado.
+  validateSearch: (search: Record<string, unknown>): { paso?: number; guardado?: true } => {
     const step = Number(search.paso);
-    return { paso: Number.isInteger(step) && step >= 1 && step <= steps.length ? step : undefined };
+    return {
+      paso: Number.isInteger(step) && step >= 1 && step <= steps.length ? step : undefined,
+      guardado: search.guardado === true ? true : undefined,
+    };
   },
   beforeLoad: requireSession,
   loader: async ({ params }) => {
@@ -43,7 +48,7 @@ const EditLink = createLink(TextLink);
 
 function DraftPage() {
   const data = Route.useLoaderData();
-  const { paso } = Route.useSearch();
+  const { paso, guardado } = Route.useSearch();
   const user = useSessionUser();
   const router = useRouter();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -69,6 +74,25 @@ function DraftPage() {
 
   const { draft } = data;
 
+  if (paso !== undefined && draft.status === "published") {
+    const backToSummary = async (saved: boolean) => {
+      await navigate({ search: { guardado: saved || undefined } });
+      await router.invalidate();
+    };
+    return (
+      <ProviderPage>
+        <DraftStep
+          key={`${draft.id}-${paso}`}
+          draft={draft}
+          index={paso - 1}
+          published
+          onSaved={() => backToSummary(true)}
+          onBack={() => backToSummary(false)}
+        />
+      </ProviderPage>
+    );
+  }
+
   if (paso !== undefined && draft.status === "draft") {
     const goTo = async (step: number | undefined) => {
       await navigate({ search: { paso: step } });
@@ -93,18 +117,19 @@ function DraftPage() {
     );
   }
 
-  return <DraftSummary draft={draft} />;
+  return <DraftSummary draft={draft} saved={guardado === true} />;
 }
 
 type PublishProblem = { title: string; body: string; fields: string[] };
 
-function DraftSummary({ draft }: { draft: Draft }) {
+function DraftSummary({ draft, saved }: { draft: Draft; saved: boolean }) {
   const router = useRouter();
   const [problem, setProblem] = useState<PublishProblem | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [justPublished, setJustPublished] = useState(false);
   const pending = steps.findIndex((step) => !step.read(draft).trim());
   const isDraft = draft.status === "draft";
+  const isWithdrawn = draft.status === "withdrawn";
 
   const publish = async () => {
     setProblem(null);
@@ -159,7 +184,11 @@ function DraftSummary({ draft }: { draft: Draft }) {
     <ProviderPage
       title={draft.title}
       subtitle={
-        isDraft ? "Borrador: no aparece en el catálogo." : "Publicado: ya aparece en el catálogo."
+        isDraft
+          ? "Borrador: no aparece en el catálogo."
+          : isWithdrawn
+            ? "Retirado: ya no aparece en el catálogo."
+            : "Publicado: ya aparece en el catálogo."
       }
     >
       <BackLink to="/proveedor" className="inline-flex items-center gap-1 self-start">
@@ -176,13 +205,27 @@ function DraftSummary({ draft }: { draft: Draft }) {
           {problem.body}
         </Notice>
       )}
-      {!isDraft && (
+      {isWithdrawn && (
+        <Notice title="Anuncio retirado" className="max-w-2xl">
+          Ya no aparece en el catálogo ni en las ofertas, y su enlace avisa de que no está
+          disponible.
+        </Notice>
+      )}
+      {draft.status === "published" && (
         <Notice
           icon={<CircleCheck />}
-          title={justPublished ? "Anuncio publicado" : "Este anuncio está publicado"}
+          title={
+            justPublished
+              ? "Anuncio publicado"
+              : saved
+                ? "Cambios guardados"
+                : "Este anuncio está publicado"
+          }
           className="max-w-2xl"
         >
-          Los visitantes ya pueden encontrarlo en el catálogo a su precio normal.
+          {saved
+            ? "El catálogo y el detalle ya muestran los datos nuevos."
+            : "Los visitantes ya pueden encontrarlo en el catálogo. Si corriges un dato, el cambio se ve al momento."}
         </Notice>
       )}
       <dl className="flex max-w-2xl flex-col divide-y divide-hairline border-y border-hairline">
@@ -208,7 +251,8 @@ function DraftSummary({ draft }: { draft: Draft }) {
                   )}
                 </dd>
               </div>
-              {isDraft && (
+              {/* Un anuncio retirado (US-014) ya no se corrige. */}
+              {(isDraft || draft.status === "published") && (
                 <EditLink
                   from={Route.fullPath}
                   search={{ paso: index + 1 }}
@@ -233,11 +277,21 @@ function DraftSummary({ draft }: { draft: Draft }) {
               </PageButton>
             )}
           </>
-        ) : (
-          <PageButton to="/experiencias/$id" params={{ id: String(draft.id) }}>
-            Ver en el catálogo
-          </PageButton>
-        )}
+        ) : draft.status === "published" ? (
+          <>
+            <PageButton to="/experiencias/$id" params={{ id: String(draft.id) }}>
+              Ver en el catálogo
+            </PageButton>
+            <PageButton
+              to="/proveedor/anuncios/$id/oferta"
+              params={{ id: String(draft.id) }}
+              variant="secondary"
+            >
+              Lanzar una oferta
+            </PageButton>
+            <WithdrawListing id={draft.id} title={draft.title} />
+          </>
+        ) : null}
       </div>
     </ProviderPage>
   );

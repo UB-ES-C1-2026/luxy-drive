@@ -202,6 +202,36 @@ Depth comes from photography, white-on-white separation and rounded clipping, ne
 - Grids drop columns at each breakpoint; they never reflow into uneven rows.
 - The booking card moves from the sticky right rail to a sticky bottom bar on mobile, with only the price and the "Solicitar reserva" CTA.
 
+## UI Text
+
+Every string a user reads is in Spanish (see `AGENTS.md`). These rules come from the screens that already exist, so that every new screen sounds the same, whoever or whatever writes it.
+
+### Voice
+- Speak to the user as **tú**: "Puedes salir y seguir otro día", "Solo puedes abrir tus propios anuncios".
+- Short, plain sentences. No exclamation marks, no emojis, no technical words: never show a status code or an error code like `not_available`.
+- Use the product's words: experiencia, anuncio, borrador, proveedor, cliente, oferta flash, empty leg, and the categories **Jets privados**, **Yates** and **Autocaravanas**.
+
+### Buttons and links
+- A verb that says what happens, plus the object when it isn't obvious: "Publicar anuncio", "Seguir rellenando", "Guardar y salir", "Ver en el catálogo".
+- While the action runs, the button is disabled and shows the gerund with an ellipsis character (`…`, not three dots): "Guardando…", "Publicando…", "Entrando…".
+- A back link names where it goes, with the chevron icon: "Mis anuncios". An empty state's way out says it in full: "Ir a mis anuncios".
+
+### Errors
+- Something failed: a `Notice` with `tone="error"`. The title says what couldn't be done, "No se ha podido…" or "No se han podido…": "No se ha podido guardar", "No se han podido cargar las experiencias". The body says what to do: "Comprueba tu conexión e inténtalo de nuevo."
+- A failed load offers a "Reintentar" action. If the user had typed something, add "No hemos borrado lo que has escrito."
+- A field error sits under its field, starts with the verb that fixes it, and gives an example when the format matters: "Escribe tu email.", "Escribe un email válido, por ejemplo nombre@dominio.com.", "Elige una categoría de la lista." Use "Escribe", not "Introduce".
+- An expired session: "Tu sesión ha caducado", then what to do: "Vuelve a iniciar sesión para seguir con el borrador."
+- Something that doesn't exist or isn't the user's: an `EmptyState` titled "No encontramos este…", with the reason and a way out: "No encontramos este anuncio" / "No existe o pertenece a otro proveedor". Something that is no longer available says so: "Esta experiencia ya no está disponible".
+
+### Empty and success states
+- Empty: an `EmptyState` whose title says what is missing, "No hay…": "No hay experiencias disponibles", "No hay experiencias con estos filtros". When there is a next step, add it as a description or an action.
+- Success: a `Notice` with the check icon, titled with the noun and its past participle: "Borrador guardado", "Anuncio publicado". The body says where the change can be seen.
+
+### Prices, dates and numbers
+- Prices go through `formatPrice` (dot for thousands, comma for cents, `€` after a space: "12.500 €", "1.999,99 €") and always say what they cover: "experiencia completa" or "por persona".
+- Dates are always in Madrid time (`timeZone: "Europe/Madrid"`, locale `es-ES`). Short in cards and lists ("12 dic, 11:00"), long in summaries ("sábado, 19 de diciembre de 2026, 17:00"). A field that takes a time says so in its help text: "En hora de Madrid."
+- Capacity is written in people: "Hasta 8 personas".
+
 ## Not Yet Defined
 
 - **Hover states** beyond the card float shadow.
