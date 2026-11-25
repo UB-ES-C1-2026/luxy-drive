@@ -4,6 +4,7 @@ import { z } from "zod";
 import { type AuthEnv, requireRole, requireUser, sameOrigin } from "../auth/session";
 import { madridLocalToUnix } from "../madrid-time";
 import { draftBody, draftChanges, draftError } from "../schemas/draft";
+import { offerBody, offerError } from "../schemas/offer";
 import { profileBody, profileError } from "../schemas/provider-profile";
 
 type ProfileRow = {
@@ -96,6 +97,41 @@ const REQUIRED_TO_PUBLISH = [
 
 // Text fields a published listing needs; an empty one would leave it incomplete.
 const EDITABLE_TEXT = ["description", "vehicle", "location"] as const;
+
+type OfferStateRow = {
+  provider_id: number | null;
+  published: 0 | 1;
+  offer_active: 0 | 1;
+  offer_type: "standard" | "last_minute" | "empty_leg";
+  offer_expires_at: number | null;
+  service_at: number | null;
+  price_cents: number | null;
+  original_price_cents: number | null;
+};
+
+const OFFER_STATE_COLUMNS =
+  "provider_id, published, offer_active, offer_type, offer_expires_at, service_at, price_cents, original_price_cents";
+
+// A special offer is running while its type is not standard and it has not expired.
+const specialRunning = (row: OfferStateRow, now: number) =>
+  row.offer_type !== "standard" && (row.offer_expires_at ?? 0) > now;
+
+const validOffer = zValidator("json", offerBody, (result, c) => {
+  if (!result.success) return c.json({ error: offerError(result.error) }, 400);
+});
+
+function toOffer(row: OfferStateRow & { id: number }) {
+  return {
+    id: row.id,
+    offerType: row.offer_type,
+    price: (row.price_cents ?? 0) / 100,
+    originalPrice: row.original_price_cents === null ? null : row.original_price_cents / 100,
+    currency: "EUR" as const,
+    priceUnit: "experiencia completa" as const,
+    offerExpiresAt:
+      row.offer_expires_at === null ? null : new Date(row.offer_expires_at * 1000).toISOString(),
+  };
+}
 
 // Price in cents and service time in Unix seconds, or a 400 telling what to fix.
 function priceAndDate(changes: { price?: number; serviceAt?: string }) {
@@ -234,15 +270,29 @@ export const provider = new Hono<AuthEnv>()
     if (past) return c.json({ error: "service_at_in_past" } as const, 400);
     try {
       const existing = await c.env.DB.prepare(
-        "SELECT provider_id, published, withdrawn_at FROM experiences WHERE id = ?",
+        "SELECT provider_id, published, withdrawn_at, offer_type, price_cents FROM experiences WHERE id = ?",
       )
         .bind(id)
-        .first<Pick<ListingRow, "provider_id" | "published" | "withdrawn_at">>();
+        .first<
+          Pick<ListingRow, "provider_id" | "published" | "withdrawn_at" | "price_cents"> &
+            Pick<OfferStateRow, "offer_type">
+        >();
       if (!existing) return c.json({ error: "not_found" } as const, 404);
       if (existing.provider_id !== userId) return c.json({ error: "forbidden" } as const, 403);
       // A withdrawn listing (US-014) is not corrected any more.
       if (existing.withdrawn_at !== null) {
         return c.json({ error: "already_withdrawn" } as const, 409);
+      }
+
+      // During a special offer price_cents is the offer price and ending the offer brings
+      // the normal one back, so a new price would be lost: the offer has to end first
+      // (US-016), even when it has already expired.
+      if (
+        priceCents !== null &&
+        priceCents !== existing.price_cents &&
+        existing.offer_type !== "standard"
+      ) {
+        return c.json({ error: "offer_active" } as const, 409);
       }
 
       // A published listing can be corrected (US-013), but the catalog and the detail
@@ -254,10 +304,10 @@ export const provider = new Hono<AuthEnv>()
         }
       }
 
-      // Ownership is part of the WHERE, and so is not being withdrawn, in case that changed
-      // in between: nothing else can be changed. A new service date also moves the end of
-      // the offer: a standard offer lasts until the service starts, and a special one can
-      // never outlast it.
+      // Ownership is part of the WHERE, and so are not being withdrawn and the price rule
+      // above, in case that changed in between: nothing else can be changed. A new service
+      // date also moves the end of the offer: a standard offer lasts until the service
+      // starts, and a special one can never outlast it.
       const row = await c.env.DB.prepare(
         `UPDATE experiences
          SET title = COALESCE(?, title),
@@ -274,6 +324,7 @@ export const provider = new Hono<AuthEnv>()
                ELSE MIN(offer_expires_at, ?)
              END
          WHERE id = ? AND provider_id = ? AND withdrawn_at IS NULL
+           AND (? IS NULL OR offer_type = 'standard' OR price_cents = ?)
          RETURNING ${LISTING_COLUMNS}`,
       )
         .bind(
@@ -290,9 +341,11 @@ export const provider = new Hono<AuthEnv>()
           serviceAt,
           id,
           userId,
+          priceCents,
+          priceCents,
         )
         .first<ListingRow>();
-      if (!row) return c.json({ error: "already_withdrawn" } as const, 409);
+      if (!row) return c.json({ error: "listing_changed" } as const, 409);
       return c.json(toListing(row), 200);
     } catch {
       return c.json({ error: "internal_error" } as const, 500);
@@ -363,6 +416,84 @@ export const provider = new Hono<AuthEnv>()
       if (existing.provider_id !== userId) return c.json({ error: "forbidden" } as const, 403);
       if (existing.published === 0) return c.json({ error: "not_published" } as const, 409);
       return c.json({ error: "already_withdrawn" } as const, 409);
+    } catch {
+      return c.json({ error: "internal_error" } as const, 500);
+    }
+  })
+  .post("/experiences/:id/offer", validId, validOffer, async (c) => {
+    const { id } = c.req.valid("param");
+    const offer = c.req.valid("json");
+    const userId = c.get("user").id;
+    const now = Math.floor(Date.now() / 1000);
+    const until = madridLocalToUnix(offer.until);
+    const priceCents = Math.round(offer.price * 100);
+    try {
+      const row = await c.env.DB.prepare(
+        `SELECT ${OFFER_STATE_COLUMNS} FROM experiences WHERE id = ?`,
+      )
+        .bind(id)
+        .first<OfferStateRow>();
+      if (!row) return c.json({ error: "not_found" } as const, 404);
+      if (row.provider_id !== userId) return c.json({ error: "forbidden" } as const, 403);
+      // Only a listing that people can find now can get an offer: not a draft, not a
+      // withdrawn listing (its offer is off) and not one whose service has passed.
+      if (row.published === 0 || row.offer_active === 0 || (row.service_at ?? 0) <= now) {
+        return c.json({ error: "not_available" } as const, 409);
+      }
+      // One price at a time: a running special offer has to end first (US-016, C3).
+      if (specialRunning(row, now)) return c.json({ error: "offer_active" } as const, 409);
+
+      // The normal price is the original one of an expired special offer, if any.
+      const normalCents =
+        row.offer_type === "standard" ? row.price_cents : row.original_price_cents;
+      if (normalCents === null || priceCents >= normalCents) {
+        return c.json({ error: "price_not_lower" } as const, 400);
+      }
+      if (until <= now) return c.json({ error: "until_in_past" } as const, 400);
+      if (until > (row.service_at ?? 0)) {
+        return c.json({ error: "until_after_service" } as const, 400);
+      }
+
+      // The WHERE repeats the checks above in case the listing changed in between.
+      const updated = await c.env.DB.prepare(
+        `UPDATE experiences
+         SET offer_type = ?, price_cents = ?, original_price_cents = ?, offer_expires_at = ?
+         WHERE id = ? AND provider_id = ? AND published = 1 AND offer_active = 1
+           AND service_at > ? AND NOT (offer_type <> 'standard' AND offer_expires_at > ?)
+         RETURNING id, ${OFFER_STATE_COLUMNS}`,
+      )
+        .bind(offer.type, priceCents, normalCents, until, id, userId, now, now)
+        .first<OfferStateRow & { id: number }>();
+      if (!updated) return c.json({ error: "offer_active" } as const, 409);
+      return c.json(toOffer(updated), 201);
+    } catch {
+      return c.json({ error: "internal_error" } as const, 500);
+    }
+  })
+  .delete("/experiences/:id/offer", validId, async (c) => {
+    const { id } = c.req.valid("param");
+    const userId = c.get("user").id;
+    try {
+      // Ending a special offer, running or already expired, brings back the normal price
+      // until the service starts, so the listing is available again at that price.
+      const updated = await c.env.DB.prepare(
+        `UPDATE experiences
+         SET offer_type = 'standard', price_cents = original_price_cents,
+             original_price_cents = NULL, offer_expires_at = service_at
+         WHERE id = ? AND provider_id = ? AND offer_type <> 'standard'
+           AND original_price_cents IS NOT NULL
+         RETURNING id, ${OFFER_STATE_COLUMNS}`,
+      )
+        .bind(id, userId)
+        .first<OfferStateRow & { id: number }>();
+      if (updated) return c.json(toOffer(updated), 200);
+
+      const row = await c.env.DB.prepare("SELECT provider_id FROM experiences WHERE id = ?")
+        .bind(id)
+        .first<Pick<OfferStateRow, "provider_id">>();
+      if (!row) return c.json({ error: "not_found" } as const, 404);
+      if (row.provider_id !== userId) return c.json({ error: "forbidden" } as const, 403);
+      return c.json({ error: "no_active_offer" } as const, 409);
     } catch {
       return c.json({ error: "internal_error" } as const, 500);
     }

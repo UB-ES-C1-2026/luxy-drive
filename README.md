@@ -384,7 +384,7 @@ sesión, `403` a una cuenta de cliente). Las escrituras exigen el `Origin` propi
 | `POST /api/provider/experiences` con al menos `title` | `201` con el borrador |
 | `GET /api/provider/experiences` | `200` con los anuncios propios (borradores y publicados), del más nuevo al más antiguo |
 | `GET /api/provider/experiences/:id` | `200` con el anuncio propio; `403 forbidden` si es de otro proveedor; `404 not_found` si no existe |
-| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el anuncio actualizado (borrador o publicado, ver US-013.b); `403` si es de otro; `409 already_withdrawn` si está retirado |
+| `PATCH /api/provider/experiences/:id` con uno o varios campos | `200` con el anuncio actualizado (borrador o publicado, ver US-013.b); `403` si es de otro; `409 already_withdrawn` si está retirado; `409 offer_active` si cambia el precio con una oferta especial |
 
 Campos: `title` (obligatorio, hasta 120 caracteres), y opcionales `description`,
 `category` (`jet`, `yacht` o `camper`), `vehicle`, `location` y `capacity` (entero
@@ -453,10 +453,16 @@ con los mismos campos y validaciones que el borrador (US-009.b y US-011.b). Ante
 | Fecha y hora ya pasadas | `400` | `{ "error": "service_at_in_past" }` |
 | Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` (no cambia) |
 | Anuncio retirado (US-014.b) | `409` | `{ "error": "already_withdrawn" }` (no cambia) |
+| Otro precio con una oferta especial sin terminar (US-016.b) | `409` | `{ "error": "offer_active" }` (no cambia) |
+| El anuncio se retira o recibe una oferta mientras se guarda | `409` | `{ "error": "listing_changed" }` (no cambia) |
 
 Si cambia `serviceAt`, la oferta se ajusta para que siga siendo coherente: una oferta
 `standard` dura hasta la nueva fecha de servicio, y una oferta especial (`last_minute` o
 `empty_leg`) nunca termina después del servicio. Si no se guarda, no cambia ningún campo.
+
+El precio no se cambia mientras el anuncio tiene una oferta especial, en curso o caducada:
+primero se termina con `DELETE /api/provider/experiences/:id/offer` (US-016.b), que devuelve
+el precio normal. Los demás campos sí se corrigen durante la oferta.
 
 ### Retirar un anuncio publicado (US-014.b)
 
@@ -478,6 +484,37 @@ con `status: "withdrawn"` (los otros estados son `draft` y `published`).
 En la base de datos, `withdrawn_at` (migración `experience_withdrawn_at`, segundos Unix UTC)
 guarda cuándo se retiró; `NULL` significa que no está retirado. Desde el frontend:
 `client.api.provider.experiences[":id"].withdraw.$post({ param: { id: "1" } })`.
+
+### Ofertas especiales de un anuncio propio (US-016.b)
+
+Un proveedor rebaja un anuncio publicado propio con una oferta flash (`last_minute`) o
+empty-leg, que aparece en `GET /api/offers` (JS-001) con su precio, el precio de antes y su
+vigencia. Un anuncio tiene una sola oferta a la vez.
+
+`POST /api/provider/experiences/:id/offer` con
+`{ "type": "last_minute" | "empty_leg", "price": 650.5, "until": "2030-06-14T20:00" }`.
+`price` es el precio rebajado en EUR por la experiencia completa y `until`, el fin de la
+oferta en hora de Madrid (formato de `<input type="datetime-local">`). Responde `201` con
+`{ id, offerType, price, originalPrice, currency, priceUnit, offerExpiresAt }`.
+
+| Caso | Status | Cuerpo |
+| --- | --- | --- |
+| Precio igual o mayor que el normal | `400` | `{ "error": "price_not_lower" }` |
+| `until` ya ha pasado | `400` | `{ "error": "until_in_past" }` |
+| `until` después de la fecha de servicio | `400` | `{ "error": "until_after_service" }` |
+| Campo no válido | `400` | `invalid_offer_type`, `invalid_price` o `invalid_until` |
+| Ya hay una oferta especial en curso | `409` | `{ "error": "offer_active" }` (no quedan dos precios) |
+| Borrador, anuncio retirado o servicio pasado | `409` | `{ "error": "not_available" }` |
+| Anuncio de otro proveedor | `403` | `{ "error": "forbidden" }` |
+
+`DELETE /api/provider/experiences/:id/offer` termina la oferta especial y devuelve el
+anuncio a su precio normal hasta la fecha de servicio (`200` con la oferta `standard`).
+Sirve también para una oferta ya caducada: al caducar, el anuncio deja de estar disponible
+(definición de US-001) hasta que se termina la oferta o se lanza otra. Sin oferta especial
+responde `409 no_active_offer`.
+
+En la base de datos se reutilizan las columnas de JS-001: `offer_type`, `price_cents`
+(precio rebajado), `original_price_cents` (precio normal) y `offer_expires_at`.
 
 ## Despliegue y credenciales
 

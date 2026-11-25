@@ -204,6 +204,16 @@ const withdrawn: Problem = {
   body: "Un anuncio retirado ya no se puede corregir. Vuelve al resumen para verlo.",
 };
 
+// Durante una oferta especial el precio guardado es el de la oferta, así que la API no deja
+// cambiarlo hasta terminarla (US-016), aunque ya haya caducado.
+const endOfferFirst =
+  "Termina antes la oferta especial de este anuncio, en «Lanzar una oferta», para cambiar el precio.";
+
+const listingChanged: Problem = {
+  title: "El anuncio ha cambiado mientras guardabas",
+  body: "No hemos guardado el cambio. Vuelve al resumen para ver sus datos actuales.",
+};
+
 /**
  * Una pregunta del borrador. "Siguiente" guarda la respuesta (la primera crea el borrador),
  * así que el proveedor puede dejarlo en cualquier paso y seguir otro día.
@@ -273,6 +283,8 @@ export function DraftStep({
       if (status === 409) {
         const { error: code } = await res.json();
         if (code === "already_withdrawn") return setProblem(withdrawn);
+        if (code === "offer_active") return setError(endOfferFirst);
+        if (code === "listing_changed") return setProblem(listingChanged);
       }
       setProblem(saveFailed);
     } catch {

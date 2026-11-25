@@ -282,6 +282,13 @@ function DraftSummary({ draft, saved }: { draft: Draft; saved: boolean }) {
             <PageButton to="/experiencias/$id" params={{ id: String(draft.id) }}>
               Ver en el catálogo
             </PageButton>
+            <PageButton
+              to="/proveedor/anuncios/$id/oferta"
+              params={{ id: String(draft.id) }}
+              variant="secondary"
+            >
+              Lanzar una oferta
+            </PageButton>
             <WithdrawListing id={draft.id} title={draft.title} />
           </>
         ) : null}
