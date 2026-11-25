@@ -4,6 +4,7 @@ import { auth } from "./routes/auth";
 import { experiences } from "./routes/experiences";
 import { offers } from "./routes/offers";
 import { provider } from "./routes/provider";
+import { providerReservations } from "./routes/provider-reservations";
 import { reservations } from "./routes/reservations";
 
 const app = new Hono<{ Bindings: Bindings }>().basePath("/api");
@@ -12,6 +13,8 @@ const routes = app
   .route("/auth", auth)
   .route("/experiences", experiences)
   .route("/offers", offers)
+  // Before "/provider": once a route answers, the provider middleware does not run again.
+  .route("/provider/reservations", providerReservations)
   .route("/provider", provider)
   .route("/reservations", reservations)
   .get("/health", async (c) => {
