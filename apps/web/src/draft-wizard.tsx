@@ -198,6 +198,12 @@ const saveFailed: Problem = {
   body: "Comprueba tu conexión e inténtalo de nuevo. No hemos borrado lo que has escrito.",
 };
 
+// Se ha retirado mientras se corregía, por ejemplo desde otra pestaña (US-014).
+const withdrawn: Problem = {
+  title: "Este anuncio está retirado",
+  body: "Un anuncio retirado ya no se puede corregir. Vuelve al resumen para verlo.",
+};
+
 /**
  * Una pregunta del borrador. "Siguiente" guarda la respuesta (la primera crea el borrador),
  * así que el proveedor puede dejarlo en cualquier paso y seguir otro día.
@@ -263,6 +269,10 @@ export function DraftStep({
           title: "Tu sesión ha caducado",
           body: "Vuelve a iniciar sesión para seguir con el borrador.",
         });
+      }
+      if (status === 409) {
+        const { error: code } = await res.json();
+        if (code === "already_withdrawn") return setProblem(withdrawn);
       }
       setProblem(saveFailed);
     } catch {
