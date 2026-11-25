@@ -25,3 +25,29 @@ runs:
       env:
         CLOUDFLARE_API_TOKEN: ${{ inputs.api-token }}
         CLOUDFLARE_ACCOUNT_ID: ${{ inputs.account-id }}
+    # TR-006: si el entorno no responde 200 en /api/health tras desplegar, el job falla.
+    - name: Comprobar /api/health
+      shell: bash
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+      run: |
+        set -uo pipefail
+        case "$ENVIRONMENT" in
+          dev) host=dev ;;
+          staging) host=staging ;;
+          production) host=app ;;
+          *) echo "::error title=Health check::Entorno desconocido: $ENVIRONMENT"; exit 1 ;;
+        esac
+        url="https://$host.luxydrive.workers.dev/api/health"
+        # El Worker nuevo puede tardar unos segundos en propagarse: 5 intentos, 10 s entre ellos.
+        for attempt in 1 2 3 4 5; do
+          status=$(curl -sS -o health.json -w '%{http_code}' --max-time 10 "$url") || true
+          if [ "$status" = "200" ]; then
+            echo "$ENVIRONMENT responde 200 en $url: $(cat health.json)"
+            exit 0
+          fi
+          echo "Intento $attempt: HTTP $status"
+          sleep 10
+        done
+        echo "::error title=Health check ($ENVIRONMENT)::$url no responde 200 después de desplegar (último HTTP $status): $(cat health.json 2>/dev/null)"
+        exit 1
