@@ -57,6 +57,9 @@ function ProviderHome() {
         <ButtonLink href="/proveedor/perfil" variant="secondary">
           Perfil de empresa
         </ButtonLink>
+        <PageButton to="/proveedor/solicitudes" variant="secondary">
+          Solicitudes recibidas
+        </PageButton>
         <PageButton to="/proveedor/anuncios/nuevo">
           <Plus aria-hidden className="size-4" />
           Nuevo anuncio
